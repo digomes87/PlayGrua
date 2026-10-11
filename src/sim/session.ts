@@ -88,10 +88,10 @@ export class Session {
 
   /** Slings the load under the hook, or releases the one standing slack on the ground. */
   toggleRigging(): RiggingAction {
-    const hookMass = this.config.spec.masses.hookBlock;
-    if (this.canRig()) return this.replace({ ...this.state, ...rig(this.state, hookMass) }, 'rigged');
+    const { spec } = this.config;
+    if (this.canRig()) return this.replace({ ...this.state, ...rig(this.state, spec) }, 'rigged');
     if (!this.canRelease()) return 'none';
-    const released = { ...this.state, ...unrig(this.state, hookMass, this.state.crane.slew.angle) };
+    const released = { ...this.state, ...unrig(this.state, spec.masses.hookBlock, this.state.crane.slew.angle) };
     const placed = released.groundLoads[released.groundLoads.length - 1]!;
     const progress = judgeRelease(this.timeline.progress, this.mission, placed);
     this.timeline = { ...this.timeline, progress };

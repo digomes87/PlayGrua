@@ -43,6 +43,8 @@ export interface CableMotion {
   readonly pivotVelocity: Vec3;
   readonly length: number;
   readonly lengthRate: number;
+  /** Rigid part of `length` (hook to centre of gravity); only the rest is rope and stretches. */
+  readonly link: number;
 }
 
 export interface Surroundings {
@@ -72,9 +74,9 @@ const EDGE_TOLERANCE = 0.05;
 
 const SLACK: CablePull = { tension: 0, direction: vec3(0, -1, 0), relativeVelocity: ZERO };
 
-/** Rope stiffness E*A/L in series with the structure. */
-export function cableStiffness(cable: CableProperties, length: number): number {
-  const rope = cable.axialStiffness / (length + cable.fixedRopeLength);
+/** Rope stiffness E*A/L in series with the structure, for `ropeLength` of rope below the trolley. */
+export function cableStiffness(cable: CableProperties, ropeLength: number): number {
+  const rope = cable.axialStiffness / (ropeLength + cable.fixedRopeLength);
   return 1 / (1 / rope + 1 / cable.structureStiffness);
 }
 
@@ -92,7 +94,7 @@ function pullOf(cable: CableProperties, mass: number, motion: CableMotion, posit
   const direction = scale(offset, 1 / distance);
   const relativeVelocity = subtract(velocity, motion.pivotVelocity);
   const stretchRate = dot(direction, relativeVelocity) - motion.lengthRate;
-  const stiffness = cableStiffness(cable, motion.length);
+  const stiffness = cableStiffness(cable, motion.length - motion.link);
   const damping = 2 * cable.dampingRatio * Math.sqrt(stiffness * mass);
   const tension = Math.max(0, stiffness * stretch + damping * stretchRate);
   return { tension, direction, relativeVelocity };
@@ -185,7 +187,8 @@ function slide(
   step: number,
 ): LoadBody {
   const pull = pullOf(cable, load.mass, motion, body.position, body.velocity);
-  const applied = add(scale(pull.direction, -pull.tension), dragForce(surroundings.windVelocity, load.dragArea));
+  const airForce = dragForce(subtract(surroundings.windVelocity, body.velocity), load.dragArea);
+  const applied = add(scale(pull.direction, -pull.tension), airForce);
   const normalForce = Math.max(0, load.mass * GRAVITY - applied.y);
   const driving = vec3(applied.x, 0, applied.z);
   const speed = magnitude(body.velocity);
@@ -229,7 +232,7 @@ export function stepLoad(
 export function mechanicalEnergy(body: LoadBody, mass: number, cable: CableProperties, motion: CableMotion): number {
   const stretch = Math.max(0, magnitude(subtract(body.position, motion.pivot)) - motion.length);
   const kinetic = 0.5 * mass * dot(body.velocity, body.velocity);
-  const elastic = 0.5 * cableStiffness(cable, motion.length) * stretch * stretch;
+  const elastic = 0.5 * cableStiffness(cable, motion.length - motion.link) * stretch * stretch;
   return kinetic + mass * GRAVITY * body.position.y + elastic;
 }
 

@@ -17,6 +17,7 @@ export const stillCable = (length: number): CableMotion => ({
   pivotVelocity: ZERO,
   length,
   lengthRate: 0,
+  link: 0,
 });
 
 export const pointMass = (mass: number): HangingMass => ({ mass, dragArea: 0, hangDepth: 0 });
