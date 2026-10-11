@@ -128,11 +128,12 @@ permitido) e o operador deve liberar o giro com `V`.
 ### Colisões
 
 Carga e moitão contra o chão, os prédios, as pilhas e as outras cargas, todos como blocos alinhados
-aos eixos. O topo de qualquer bloco é superfície de pouso. Pouso acima de 0,5 m/s conta como brusco.
+aos eixos. O topo de qualquer bloco é superfície de pouso, desde que o centro de gravidade da carga
+esteja sobre ele: com o centro para fora da borda a carga não fica apoiada e cai. Pouso acima de 0,5 m/s conta como brusco.
 
 ## Testes
 
-`npm test` roda 187 testes, entre eles os obrigatórios:
+`npm test` roda 196 testes, entre eles os obrigatórios:
 
 - período do pêndulo contra `2π√(L/g)` para cabos de 5, 20 e 40 m, erro abaixo de 1 %;
 - conservação de energia sem amortecimento nem atuação: deriva abaixo de 0,5 % em 60 s;
@@ -140,7 +141,8 @@ aos eixos. O topo de qualquer bloco é superfície de pouso. Pouso acima de 0,5 
 - bloqueio do LMI a 100 %, isolado e com a grua em operação;
 - determinismo: duas execuções com a mesma entrada e semente dão estado idêntico.
 
-Há também testes de atrito de solo, cabo frouxo, pico de carga no tranco, vento na carga, cata-vento,
+Há também testes de conservação do momento angular do conjunto lança + carga com o giro livre
+(deriva abaixo de 1 % em 30 s), atrito de solo, cabo frouxo, pico de carga no tranco, vento na carga, cata-vento,
 colisões, missões, pontuação e persistência.
 
 ## Limitações conhecidas

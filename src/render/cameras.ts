@@ -11,7 +11,7 @@ export const CAMERA_LABELS: Readonly<Record<CameraMode, string>> = {
 };
 
 const ORDER: readonly CameraMode[] = ['cab', 'orbit', 'hook'];
-const CAB_OFFSET = { along: 3.6, down: 1.4, side: 1.9 };
+const CAB_OFFSET = { along: 4.6, down: 1.7, side: 1.9 };
 const HOOK_VIEW_WIDTH = 9;
 const ORBIT_SENSITIVITY = 0.005;
 const ZOOM_SENSITIVITY = 0.0012;
