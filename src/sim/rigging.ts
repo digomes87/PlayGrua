@@ -38,7 +38,8 @@ export interface RiggingState {
 
 const REACH_RADIUS = 1.2;
 const MAX_SLING = 3;
-const MIN_SLING = 0.5;
+/** Clearance kept between the hook block and the top of the payload it is slung to. */
+const SLING_CLEARANCE = 0.1;
 const HOOK_OVERLAP = 0.1;
 /** The rope must carry no more than this multiple of the hook block weight to unhook. */
 const UNHOOK_TENSION_FACTOR = 1.5;
@@ -68,12 +69,13 @@ export const reachableLoad = (state: RiggingState): GroundLoad | undefined => {
 };
 
 /** Slings the reachable load: the hook snaps over its centre and the load starts on the ground. */
-export function rig(state: RiggingState, hookMass: number): RiggingState {
+export function rig(state: RiggingState, spec: CraneSpec): RiggingState {
   const load = reachableLoad(state);
   if (load === undefined) return state;
-  const slingDepth = Math.max(state.body.position.y - load.position.y, load.payload.size.y + MIN_SLING);
+  const shortest = load.payload.size.y + spec.geometry.hookBlockHeight + SLING_CLEARANCE;
+  const slingDepth = Math.max(state.body.position.y - load.position.y, shortest);
   const rigged = { payload: load.payload, slingDepth };
-  const centreHeight = load.position.y + slingDepth - centreOffset(rigged, hookMass);
+  const centreHeight = load.position.y + slingDepth - centreOffset(rigged, spec.masses.hookBlock);
   return {
     body: { position: vec3(load.position.x, centreHeight, load.position.z), velocity: ZERO, grounded: true },
     rigged,

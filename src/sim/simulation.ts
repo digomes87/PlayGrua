@@ -146,6 +146,7 @@ function cableMotion(before: CraneState, after: CraneState, link: number, spec: 
     pivotVelocity: scale(subtract(trolleyPosition(after, spec), pivot), 1 / step),
     length: before.hoist.length + link,
     lengthRate: (after.hoist.length - before.hoist.length) / step,
+    link,
   };
 }
 

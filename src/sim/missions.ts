@@ -43,7 +43,7 @@ export interface Mission {
   readonly parSeconds: number;
 }
 
-const ANY_SWING = Math.PI;
+const ANY_SWING = Number.POSITIVE_INFINITY;
 const onGround = (x: number, z: number, yaw = 0): Pick<GroundLoad, 'position' | 'yaw'> => ({
   position: vec3(x, 0, z),
   yaw,

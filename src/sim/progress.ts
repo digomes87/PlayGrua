@@ -18,7 +18,7 @@ export interface Progress {
   readonly collisions: number;
   readonly cutoffs: number;
   readonly overloaded: boolean;
-  /** Rope angle when the payload last touched down, radians. */
+  /** Rope angle when the payload last touched down, radians; infinite until it has landed once. */
   readonly touchdownSwing: number;
   readonly holdTime: number;
   readonly inContact: boolean;
@@ -41,7 +41,7 @@ export const INITIAL_PROGRESS: Progress = {
   collisions: 0,
   cutoffs: 0,
   overloaded: false,
-  touchdownSwing: 0,
+  touchdownSwing: Number.POSITIVE_INFINITY,
   holdTime: 0,
   inContact: false,
   wasBlocked: false,
@@ -140,7 +140,7 @@ export function judgeRelease(progress: Progress, mission: Mission, released: Gro
   if (progress.outcome !== 'running' || goal === null || goal.kind !== 'place') return progress;
   if (released.payload.id !== goal.payloadId) return progress;
   if (!isInZone(goal, released)) return { ...progress, message: 'Fora do alvo. Reposicione a carga.' };
-  if (progress.touchdownSwing > goal.maxTouchdownSwing) {
+  if (!(progress.touchdownSwing <= goal.maxTouchdownSwing)) {
     return { ...progress, message: 'Balanço acima do permitido no pouso. Tente de novo.' };
   }
   return { ...progress, outcome: 'success', message: 'Carga posicionada.' };

@@ -120,12 +120,12 @@ describe('rigging', () => {
   });
 
   test('rigging moves the payload from the ground onto the hook', () => {
-    const rigged = rig(start, SPEC.masses.hookBlock);
+    const rigged = rig(start, SPEC);
 
     expect(rigged.rigged?.payload).toBe(CONCRETE_BLOCK);
     expect(rigged.groundLoads).toHaveLength(0);
     expect(rigged.body.grounded).toBe(true);
-    expect(rigged.rigged!.slingDepth).toBeGreaterThanOrEqual(CONCRETE_BLOCK.size.y + 0.5);
+    expect(rigged.rigged!.slingDepth).toBeGreaterThan(CONCRETE_BLOCK.size.y + SPEC.geometry.hookBlockHeight);
     expect(rigged.body.position.y).toBeLessThan(rigged.rigged!.slingDepth);
     expect(rigged.body.position.y).toBeGreaterThan(CONCRETE_BLOCK.size.y / 2);
   });
@@ -133,6 +133,6 @@ describe('rigging', () => {
   test('rigging with nothing in reach changes nothing', () => {
     const empty = createSimulation(OPEN_FIELD, { radius: 30, hookHeight: 2.5, slewAngle: 0, groundLoads: [load] });
 
-    expect(rig(empty, SPEC.masses.hookBlock)).toBe(empty);
+    expect(rig(empty, SPEC)).toBe(empty);
   });
 });

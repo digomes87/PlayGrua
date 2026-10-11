@@ -59,7 +59,7 @@ export function slungAt(payload: Payload, radius: number, config: SimulationConf
     slewAngle: 0,
     groundLoads: [onGroundAt(payload, radius)],
   });
-  return { ...start, ...rig(start, SPEC.masses.hookBlock) };
+  return { ...start, ...rig(start, SPEC) };
 }
 
 /** Slung payload lifted clear of the ground and left to settle. */

@@ -30,11 +30,14 @@ const overlapsInPlan = (obstacle: Obstacle, position: Vec3, halfWidth: number): 
   position.z + halfWidth > obstacle.minZ &&
   position.z - halfWidth < obstacle.maxZ;
 
-/** Height of the highest surface under the load that its underside has not gone below. */
+/**
+ * Height of the highest surface under the load's centre of gravity that its underside has not gone
+ * below. A load whose centre overhangs an edge is not supported, however much of it still overlaps.
+ */
 export function supportHeightBelow(obstacles: readonly Obstacle[], body: LoadBody, footprint: Footprint): number {
   const underside = body.position.y - footprint.hangDepth;
   return obstacles
-    .filter((obstacle) => overlapsInPlan(obstacle, body.position, footprint.halfWidth))
+    .filter((obstacle) => overlapsInPlan(obstacle, body.position, 0))
     .filter((obstacle) => obstacle.height <= underside + STEP_TOLERANCE)
     .reduce((highest, obstacle) => Math.max(highest, obstacle.height), GROUND_HEIGHT);
 }
