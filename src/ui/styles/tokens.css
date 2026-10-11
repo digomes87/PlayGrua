@@ -1,0 +1,93 @@
+:root {
+  --color-glass: oklch(17% 0.008 250 / 0.86);
+  --color-glass-solid: oklch(15% 0.008 250);
+  --color-ink: oklch(92% 0.02 90);
+  --color-ink-dim: oklch(70% 0.02 90);
+  --color-hairline: oklch(92% 0.02 90 / 0.16);
+  --color-amber: oklch(80% 0.17 78);
+  --color-ok: oklch(80% 0.17 158);
+  --color-danger: oklch(66% 0.24 30);
+  --color-zone: oklch(78% 0.16 168);
+
+  --font-label: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-figure: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --text-label: 0.78rem;
+  --text-figure: clamp(1.25rem, 1rem + 1vw, 1.9rem);
+  --text-figure-hero: clamp(2.6rem, 1.8rem + 3vw, 4.4rem);
+  --text-title: clamp(3.2rem, 1.5rem + 8vw, 8.5rem);
+
+  --space-1: 0.375rem;
+  --space-2: 0.75rem;
+  --space-3: 1.25rem;
+  --space-4: 2rem;
+  --space-gutter: clamp(1rem, 0.5rem + 2vw, 2.5rem);
+
+  --radius-panel: 3px;
+  --duration-fast: 140ms;
+  --duration-blink: 700ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--color-glass-solid);
+  color: var(--color-ink);
+  font-family: var(--font-label);
+  -webkit-font-smoothing: antialiased;
+}
+
+#stage,
+#scene {
+  position: fixed;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#scene {
+  touch-action: none;
+}
+
+.label {
+  font-size: var(--text-label);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-dim);
+}
+
+.figure {
+  font-family: var(--font-figure);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+@keyframes blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
