@@ -15,7 +15,7 @@ Requer Node 22 ou mais novo.
 npm install
 npm run dev        # servidor de desenvolvimento
 npm test           # testes da física e da simulação (Vitest)
-npm run test:e2e   # testes no navegador (Playwright, usa o Chrome instalado)
+npm run test:e2e   # testes no navegador: Chrome, Firefox e WebKit (npx playwright install firefox webkit)
 npm run build      # gera dist/
 npm run preview    # serve o build em /PlayGrua/
 ```
