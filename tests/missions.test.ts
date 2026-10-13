@@ -208,7 +208,7 @@ describe('telemetry', () => {
   });
 
   test('flags landings faster than 0.5 m/s as hard', () => {
-    const carrying = { ...state, cargo: { payload: basic.loads[0]!.payload, slingLength: 2, body: state.body, yaw: 0, yawRate: 0 } };
+    const carrying = { ...state, cargo: { payload: basic.loads[0]!.payload, slingLength: 2, body: state.body, yaw: 0, yawRate: 0, tagHeading: null } };
     const soft = track(INITIAL_PROGRESS, basic, carrying, { touchdownSpeed: 0.3, bumpSpeed: 0, ropeFouled: false }, SPEC, FIXED_STEP);
     const hard = track(soft, basic, carrying, { touchdownSpeed: 0.8, bumpSpeed: 0, ropeFouled: false }, SPEC, FIXED_STEP);
 

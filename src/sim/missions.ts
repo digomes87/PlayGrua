@@ -108,7 +108,7 @@ export const MISSIONS: readonly Mission[] = [
   {
     id: 'wind',
     title: 'Vento',
-    briefing: 'Posicione o painel de forma sobre o embasamento com rajadas de até 40 km/h.',
+    briefing: 'Posicione o painel de forma sobre o embasamento com rajadas de até 40 km/h. Sem cabo-guia (T) o painel gira com o vento.',
     wind: GUSTY,
     start: { radius: 16, hookHeight: 12, slewAngle: degToRad(-10) },
     loads: [{ payload: FORMWORK_PANEL, ...onGround(20, -12) }],

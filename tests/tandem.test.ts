@@ -27,6 +27,7 @@ const air = (wind = ZERO, support = FAR) => ({
   cargoSupport: support,
   friction: SPEC.groundFriction,
   jibHeading: 0,
+  tagLine: null,
 });
 
 /** Statically stretched lengths of rope and slings under the hanging masses. */

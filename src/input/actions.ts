@@ -1,6 +1,6 @@
 /** Discrete operator actions and the analogue demand, independent of the device that produced them. */
 
-export type Action = 'camera' | 'rigging' | 'emergency' | 'weathervane' | 'menu' | 'restart';
+export type Action = 'camera' | 'rigging' | 'tagline' | 'emergency' | 'weathervane' | 'menu' | 'restart';
 
 export interface Axes {
   /** Positive turns the jib to the operator's right. */

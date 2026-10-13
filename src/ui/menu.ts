@@ -24,6 +24,7 @@ const KEYS: readonly (readonly [string, string])[] = [
   ['↑ / ↓', 'Guincho sobe / desce'],
   ['Shift', 'Modo fino (velocidade reduzida)'],
   ['Espaço', 'Engatar ou soltar a carga'],
+  ['T', 'Cabo-guia: sinaleiros seguram a orientação da carga'],
   ['C', 'Trocar câmera'],
   ['H', 'Buzina'],
   ['X', 'Parada de emergência'],
