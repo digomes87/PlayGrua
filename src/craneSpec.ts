@@ -15,6 +15,11 @@ export interface AeroSegment {
   readonly arm: number;
 }
 
+export interface HoistGear {
+  readonly force: number;
+  readonly reflectedMass: number;
+}
+
 export interface CraneSpec {
   readonly geometry: {
     readonly trolleyHeight: number;
@@ -46,7 +51,12 @@ export interface CraneSpec {
     readonly maxSpeed: number;
     readonly acceleration: number;
     readonly deceleration: number;
-    readonly emergencyDeceleration: number;
+    /** Largest force the trolley drive puts on the trolley, N. */
+    readonly driveForce: number;
+    readonly brakeForce: number;
+    /** Trolley mass plus the drive train reflected to it, kg. */
+    readonly effectiveMass: number;
+    readonly controlBandwidth: number;
   };
   readonly hoist: {
     readonly lightSpeed: number;
@@ -54,7 +64,11 @@ export interface CraneSpec {
     readonly heavyLoadThreshold: number;
     readonly acceleration: number;
     readonly deceleration: number;
-    readonly emergencyDeceleration: number;
+    /** Rope force the motor can hold and the drive train inertia seen at the hook, per gear. */
+    readonly lightGear: HoistGear;
+    readonly heavyGear: HoistGear;
+    readonly brakeForce: number;
+    readonly controlBandwidth: number;
     readonly maxCableLength: number;
     /** Fraction of the hook block weight below which the slack-rope switch stops lowering. */
     readonly slackTensionFraction: number;
@@ -147,7 +161,10 @@ export const DEFAULT_CRANE_SPEC: CraneSpec = {
     maxSpeed: 1.0,
     acceleration: 0.4,
     deceleration: 0.5,
-    emergencyDeceleration: 1.0,
+    driveForce: 9000,
+    brakeForce: 14000,
+    effectiveMass: 1950,
+    controlBandwidth: 20,
   },
   hoist: {
     lightSpeed: 1.2,
@@ -155,7 +172,10 @@ export const DEFAULT_CRANE_SPEC: CraneSpec = {
     heavyLoadThreshold: tonnesToKg(4),
     acceleration: 0.5,
     deceleration: 0.6,
-    emergencyDeceleration: 1.5,
+    lightGear: { force: 55000, reflectedMass: 8000 },
+    heavyGear: { force: 106000, reflectedMass: 32000 },
+    brakeForce: 130000,
+    controlBandwidth: 20,
     maxCableLength: 49,
     slackTensionFraction: 0.5,
   },
