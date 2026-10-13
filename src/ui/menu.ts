@@ -1,15 +1,19 @@
 /** Mission select, settings and result screens. */
+import type { Language } from '../i18n/language';
+import type { Messages } from '../i18n/messages';
 import { MISSIONS, type Mission, type MissionId } from '../sim/missions';
 import type { Progress } from '../sim/progress';
 import { scoreLines, scoreOf } from '../sim/scoring';
 import type { BestResults, Settings } from '../sim/storage';
 import { element } from './dom';
+import { languageSwitch } from './languageSwitch';
 
 export interface MenuHandlers {
   readonly onStart: (mission: MissionId) => void;
   readonly onResume: () => void;
   readonly onSettings: (settings: Settings) => void;
   readonly onReplay: () => void;
+  readonly onLanguage: (language: Language) => void;
 }
 
 export interface MenuState {
@@ -18,28 +22,8 @@ export interface MenuState {
   readonly canResume: boolean;
 }
 
-const KEYS: readonly (readonly [string, string])[] = [
-  ['A / D', 'Giro à esquerda / direita'],
-  ['W / S', 'Carrinho para fora / para dentro'],
-  ['↑ / ↓', 'Guincho sobe / desce'],
-  ['Shift', 'Modo fino (velocidade reduzida)'],
-  ['Espaço', 'Engatar ou soltar a carga'],
-  ['T', 'Cabo-guia: sinaleiros seguram a orientação da carga'],
-  ['C', 'Trocar câmera'],
-  ['H', 'Buzina'],
-  ['X', 'Parada de emergência'],
-  ['V', 'Cata-vento (libera o freio de giro)'],
-  ['R · Esc', 'Reiniciar · Menu'],
-  ['Gamepad', 'Esq.: giro e carrinho · Dir.: guincho · A engata · B emergência · Y câmera · LB fino'],
-];
-
-function masthead(): HTMLElement {
-  const header = element('header', 'masthead');
-  const title = element('h1', 'masthead__title', 'Play');
-  title.append(element('em', '', 'Grua'));
-  header.append(title, element('p', 'masthead__tagline', 'Simulador de grua torre · física real, sem atalhos'));
-  return header;
-}
+const PRIMARY_CONTROL = '.mission-row, .button';
+const CHOSEN_LANGUAGE = '.language__option[aria-pressed="true"]';
 
 function bestLabel(best: BestResults, mission: Mission): string {
   const result = best[mission.id];
@@ -47,9 +31,9 @@ function bestLabel(best: BestResults, mission: Mission): string {
   return `${result.score} pts · ${result.seconds.toFixed(0)} s`;
 }
 
-function keyTable(): HTMLElement {
+function keyTable(keys: Messages['menu']['keys']): HTMLElement {
   const table = element('table', 'keys');
-  KEYS.forEach(([key, action]) => {
+  keys.forEach(([key, action]) => {
     const row = element('tr');
     const head = element('th', '', key);
     head.scope = 'row';
@@ -87,9 +71,14 @@ function toggle(label: string, checked: boolean, onChange: (checked: boolean) =>
 }
 
 export class Menu {
+  private current: Settings = { expo: 0, deadzone: 0, muted: false };
+  /** Draws the screen on show, so a change of language can draw it again. */
+  private screen: () => void = () => undefined;
+
   constructor(
     private readonly root: HTMLElement,
     private readonly handlers: MenuHandlers,
+    private text: Messages,
   ) {}
 
   get isOpen(): boolean {
@@ -101,50 +90,96 @@ export class Menu {
   }
 
   showMissions(state: MenuState): void {
-    const list = element('ol', 'missions');
-    MISSIONS.forEach((mission) => list.append(this.missionRow(mission, state.best)));
-    const main = element('div');
-    main.append(list);
-    if (state.canResume) main.append(this.actions([['Continuar', this.handlers.onResume, false]]));
-    this.open(masthead(), main, this.sidebar(state.settings));
+    this.current = state.settings;
+    this.show(() => this.drawMissions(state.best, state.canResume));
   }
 
   showResult(mission: Mission, progress: Progress, best: BestResults): void {
+    this.show(() => this.drawResult(mission, progress, best));
+  }
+
+  /** Redraws the open screen in another language and keeps the focus on the language switch. */
+  translate(text: Messages): void {
+    this.text = text;
+    if (!this.isOpen) return;
+    this.screen();
+    this.focus(CHOSEN_LANGUAGE);
+  }
+
+  private show(screen: () => void): void {
+    this.screen = screen;
+    screen();
+    this.root.hidden = false;
+    this.focus(PRIMARY_CONTROL);
+  }
+
+  private focus(selector: string): void {
+    this.root.querySelector<HTMLElement>(selector)?.focus();
+  }
+
+  private drawMissions(best: BestResults, canResume: boolean): void {
+    const list = element('ol', 'missions');
+    MISSIONS.forEach((mission) => list.append(this.missionRow(mission, best)));
+    const main = element('div');
+    main.append(list);
+    if (canResume) main.append(this.actions([[this.text.menu.resume, this.handlers.onResume, false]]));
+    this.root.replaceChildren(this.masthead(), main, this.sidebar());
+  }
+
+  private drawResult(mission: Mission, progress: Progress, best: BestResults): void {
+    const { menu } = this.text;
+    const main = element('div');
+    main.append(
+      this.verdict(mission, progress),
+      element('p', 'masthead__tagline', this.text.progress[progress.message]),
+      this.scoreTable(mission, progress),
+      element('p', 'mission-row__best', `${menu.best}: ${bestLabel(best, mission)}`),
+      this.actions([
+        [menu.retry, () => this.handlers.onStart(mission.id), false],
+        [menu.replay, () => this.handlers.onReplay(), true],
+        [menu.missions, () => this.handlers.onResume(), true],
+      ]),
+    );
+    this.root.replaceChildren(this.masthead(), main, element('div'));
+  }
+
+  private masthead(): HTMLElement {
+    const header = element('header', 'masthead');
+    const title = element('h1', 'masthead__title', 'Play');
+    title.append(element('em', '', 'Grua'));
+    header.append(
+      title,
+      languageSwitch(this.text.languageSwitch, this.text.language, this.handlers.onLanguage),
+      element('p', 'masthead__tagline', this.text.tagline),
+    );
+    return header;
+  }
+
+  private verdict(mission: Mission, progress: Progress): HTMLElement {
     const succeeded = progress.outcome === 'success';
-    const verdict = element('h2', succeeded ? 'verdict' : 'verdict verdict--failed', succeeded ? 'Missão cumprida' : 'Missão falhou');
+    const label = succeeded ? this.text.menu.succeeded : this.text.menu.failed;
+    const verdict = element('h2', succeeded ? 'verdict' : 'verdict verdict--failed', label);
     verdict.append(element('span', 'verdict__score', `${scoreOf(progress, mission)} pts`));
+    return verdict;
+  }
+
+  private scoreTable(mission: Mission, progress: Progress): HTMLElement {
     const table = element('table', 'score-lines');
     scoreLines(progress, mission).forEach((line) => {
       const row = element('tr');
-      row.append(element('td', '', line.label), element('td', '', line.value), element('td', '', `−${line.penalty.toFixed(0)}`));
+      const label = this.text.score[line.criterion];
+      row.append(element('td', '', label), element('td', '', line.value), element('td', '', `−${line.penalty.toFixed(0)}`));
       table.append(row);
     });
-    const main = element('div');
-    main.append(
-      verdict,
-      element('p', 'masthead__tagline', progress.message),
-      table,
-      element('p', 'mission-row__best', `Melhor: ${bestLabel(best, mission)}`),
-      this.actions([
-        ['Tentar de novo', () => this.handlers.onStart(mission.id), false],
-        ['Rever a operação', () => this.handlers.onReplay(), true],
-        ['Missões', () => this.handlers.onResume(), true],
-      ]),
-    );
-    this.open(masthead(), main, element('div'));
-  }
-
-  private open(...content: HTMLElement[]): void {
-    this.root.replaceChildren(...content);
-    this.root.hidden = false;
-    this.root.querySelector('button')?.focus();
+    return table;
   }
 
   private missionRow(mission: Mission, best: BestResults): HTMLElement {
+    const { title, briefing } = this.text.missions[mission.id];
     const item = element('li');
     const button = element('button', 'mission-row');
     const text = element('span');
-    text.append(element('span', 'mission-row__title', mission.title), element('span', 'mission-row__brief', mission.briefing));
+    text.append(element('span', 'mission-row__title', title), element('span', 'mission-row__brief', briefing));
     button.type = 'button';
     button.append(text, element('span', 'mission-row__best', bestLabel(best, mission)));
     button.addEventListener('click', () => this.handlers.onStart(mission.id));
@@ -163,25 +198,23 @@ export class Menu {
     return row;
   }
 
-  private sidebar(settings: Settings): HTMLElement {
+  private sidebar(): HTMLElement {
+    const { menu } = this.text;
     const controls = element('section');
-    controls.append(element('h2', '', 'Controles'), keyTable());
+    controls.append(element('h2', '', menu.controls), keyTable(menu.keys));
     const tuning = element('section');
     const change = (patch: Partial<Settings>): void => {
       this.current = { ...this.current, ...patch };
       this.handlers.onSettings(this.current);
     };
-    this.current = settings;
     tuning.append(
-      element('h2', '', 'Ajustes do joystick'),
-      slider('Curva expo', settings.expo, 1, (expo) => change({ expo })),
-      slider('Zona morta', settings.deadzone, 0.5, (deadzone) => change({ deadzone })),
-      toggle('Silenciar alarmes', settings.muted, (muted) => change({ muted })),
+      element('h2', '', menu.joystick),
+      slider(menu.expo, this.current.expo, 1, (expo) => change({ expo })),
+      slider(menu.deadzone, this.current.deadzone, 0.5, (deadzone) => change({ deadzone })),
+      toggle(menu.mute, this.current.muted, (muted) => change({ muted })),
     );
     const sidebar = element('aside', 'sidebar');
     sidebar.append(controls, tuning);
     return sidebar;
   }
-
-  private current: Settings = { expo: 0, deadzone: 0, muted: false };
 }

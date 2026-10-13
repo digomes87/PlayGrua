@@ -37,5 +37,5 @@ export const DEFAULT_SITE: Site = {
     { id: 'stack-blocks', kind: 'stack', minX: 16, maxX: 19, minZ: 8, maxZ: 11, height: 1.2 },
     { id: 'stack-pipes', kind: 'stack', minX: -16, maxX: -11, minZ: -22, maxZ: -19, height: 1.4 },
   ],
-  zones: [{ id: 'street', label: 'Rua', minX: -80, maxX: 80, minZ: 48, maxZ: 80 }],
+  zones: [{ id: 'street', label: 'Street', minX: -80, maxX: 80, minZ: 48, maxZ: 80 }],
 };

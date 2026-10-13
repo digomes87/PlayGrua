@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 40" preserveAspectRatio="none">
+  <clipPath id="frame"><path d="M0 0h60v40H0z"/></clipPath>
+  <clipPath id="quarters"><path d="M30 20h30v20zv20H0zH0V0zV0h30z"/></clipPath>
+  <g clip-path="url(#frame)">
+    <path d="M0 0h60v40H0z" fill="#012169"/>
+    <path d="M0 0l60 40M60 0L0 40" stroke="#fff" stroke-width="7"/>
+    <path d="M0 0l60 40M60 0L0 40" clip-path="url(#quarters)" stroke="#c8102e" stroke-width="4.6"/>
+    <path d="M30 0v40M0 20h60" stroke="#fff" stroke-width="12"/>
+    <path d="M30 0v40M0 20h60" stroke="#c8102e" stroke-width="7"/>
+  </g>
+</svg>

@@ -1,10 +1,12 @@
 /** Application shell: wires input, simulation, 3D view, instrument panel and menus. */
 import { DEFAULT_CRANE_SPEC } from './craneSpec';
+import { messagesFor } from './i18n/catalogue';
+import type { Language } from './i18n/language';
+import type { AlarmText, Messages } from './i18n/messages';
 import { type Action, type DeviceInput, mergeInputs } from './input/actions';
 import { CAB_LAYOUT, GamepadReader } from './input/gamepad';
 import { Keyboard } from './input/keyboard';
 import type { CraneCommand } from './physics/crane';
-import { CAMERA_LABELS } from './render/cameras';
 import { SceneView } from './render/view';
 import { PHYSICS_RATE_HZ } from './physics/units';
 import { type MissionId, missionById } from './sim/missions';
@@ -13,12 +15,23 @@ import { scoreOf } from './sim/scoring';
 import { Session } from './sim/session';
 import { DEFAULT_SITE } from './sim/site';
 import { zonePermits } from './sim/zoning';
-import { type BestResults, type Settings, browserStore, loadBestResults, loadSettings, recordResult, saveSettings } from './sim/storage';
+import {
+  type BestResults,
+  type Settings,
+  browserStore,
+  loadBestResults,
+  loadLanguage,
+  loadSettings,
+  recordResult,
+  saveLanguage,
+  saveSettings,
+} from './sim/storage';
 import { CabAudio } from './ui/audio';
 import { requireElement } from './ui/dom';
 import { type Alarm, Hud } from './ui/hud';
 import { type Instruments, readInstruments } from './ui/instruments';
 import { Menu } from './ui/menu';
+import { translatePage } from './ui/page';
 
 const MAX_FRAME_SECONDS = 0.25;
 const MILLISECONDS = 1000;
@@ -38,18 +51,18 @@ interface Hazards {
   readonly isRopeFouled: boolean;
 }
 
-function alarmsFor(instruments: Instruments, latches: Latches, hazards: Hazards): readonly Alarm[] {
+function alarmsFor(instruments: Instruments, latches: Latches, hazards: Hazards, text: AlarmText): readonly Alarm[] {
   const candidates: readonly (Alarm | false)[] = [
-    latches.emergency && { text: 'Parada de emergência · X para rearmar', severity: 'danger', steady: true },
-    hazards.isRopeFouled && { text: 'Cabo encostado na estrutura', severity: 'danger', steady: false },
-    hazards.isZoneLimited && { text: 'Limite de zona · movimento bloqueado', severity: 'warning', steady: true },
-    instruments.lmiStatus === 'overload' && { text: 'Sobrecarga acima de 110 %', severity: 'danger', steady: false },
-    instruments.lmiStatus === 'cutoff' && { text: 'LMI · bloqueio: só descer ou recolher', severity: 'danger', steady: false },
-    instruments.lmiStatus === 'warning' && { text: 'LMI · 90 % da capacidade', severity: 'warning', steady: false },
-    instruments.windLevel === 'lockout' && { text: 'Vento acima de 72 km/h · operação bloqueada · V libera o giro', severity: 'danger', steady: false },
-    instruments.windLevel === 'alert' && { text: 'Vento forte', severity: 'warning', steady: false },
-    hazards.isTagLineHeld && { text: 'Cabo-guia · sinaleiros segurando a carga', severity: 'warning', steady: true },
-    latches.weathervane && { text: 'Cata-vento · freio de giro liberado', severity: 'warning', steady: true },
+    latches.emergency && { text: text.emergency, severity: 'danger', steady: true },
+    hazards.isRopeFouled && { text: text.ropeFouled, severity: 'danger', steady: false },
+    hazards.isZoneLimited && { text: text.zoneLimit, severity: 'warning', steady: true },
+    instruments.lmiStatus === 'overload' && { text: text.overload, severity: 'danger', steady: false },
+    instruments.lmiStatus === 'cutoff' && { text: text.cutoff, severity: 'danger', steady: false },
+    instruments.lmiStatus === 'warning' && { text: text.warning, severity: 'warning', steady: false },
+    instruments.windLevel === 'lockout' && { text: text.windLockout, severity: 'danger', steady: false },
+    instruments.windLevel === 'alert' && { text: text.windAlert, severity: 'warning', steady: false },
+    hazards.isTagLineHeld && { text: text.tagLine, severity: 'warning', steady: true },
+    latches.weathervane && { text: text.weathervane, severity: 'warning', steady: true },
   ];
   return candidates.filter((alarm): alarm is Alarm => alarm !== false);
 }
@@ -57,7 +70,7 @@ function alarmsFor(instruments: Instruments, latches: Latches, hazards: Hazards)
 export class App {
   private readonly store = browserStore();
   private readonly view: SceneView;
-  private readonly hud: Hud;
+  private hud: Hud;
   private readonly menu: Menu;
   private readonly keyboard = new Keyboard(window);
   private readonly gamepad = new GamepadReader(CAB_LAYOUT);
@@ -65,6 +78,7 @@ export class App {
   private session: Session;
   private settings: Settings;
   private best: BestResults;
+  private text: Messages;
   private latches = RELEASED;
   private lastFrame = 0;
   private isReported = false;
@@ -75,14 +89,21 @@ export class App {
     const canvas = requireElement('scene', HTMLCanvasElement);
     this.settings = loadSettings(this.store);
     this.best = loadBestResults(this.store);
+    this.text = messagesFor(loadLanguage(this.store));
+    translatePage(this.text);
     this.view = new SceneView(canvas, DEFAULT_CRANE_SPEC, DEFAULT_SITE);
-    this.hud = new Hud(requireElement('hud', HTMLElement));
-    this.menu = new Menu(requireElement('overlay', HTMLElement), {
-      onStart: (mission) => this.start(mission),
-      onResume: () => this.resume(),
-      onSettings: (settings) => this.applySettings(settings),
-      onReplay: () => this.startReplay(),
-    });
+    this.hud = new Hud(requireElement('hud', HTMLElement), this.text);
+    this.menu = new Menu(
+      requireElement('overlay', HTMLElement),
+      {
+        onStart: (mission) => this.start(mission),
+        onResume: () => this.resume(),
+        onSettings: (settings) => this.applySettings(settings),
+        onReplay: () => this.startReplay(),
+        onLanguage: (language) => this.applyLanguage(language),
+      },
+      this.text,
+    );
     this.session = this.load('free');
     window.addEventListener('resize', () => {
       this.view.resize();
@@ -162,10 +183,10 @@ export class App {
     });
     this.hud.update({
       instruments,
-      alarms: alarmsFor(instruments, this.latches, this.hazards()),
+      alarms: alarmsFor(instruments, this.latches, this.hazards(), this.text.alarms),
       elapsed: this.shown.progress.elapsed,
       hint: this.hint(),
-      cameraLabel: CAMERA_LABELS[this.view.cameraMode],
+      cameraLabel: this.text.cameras[this.view.cameraMode],
     });
   }
 
@@ -180,10 +201,11 @@ export class App {
   }
 
   private hint(): string {
-    if (this.replay !== null) return `Replay ${REPLAY_SPEED}× · ${Math.round(this.replay.progress * 100)} % · Esc encerra`;
-    if (this.session.canRig()) return 'Espaço: engatar a carga';
-    if (this.session.canRelease()) return 'Espaço: soltar a carga';
-    return this.session.progress.message;
+    const { hints, progress } = this.text;
+    if (this.replay !== null) return hints.replay(REPLAY_SPEED, Math.round(this.replay.progress * 100));
+    if (this.session.canRig()) return hints.rig;
+    if (this.session.canRelease()) return hints.release;
+    return progress[this.session.progress.message];
   }
 
   private perform(action: Action): void {
@@ -242,5 +264,16 @@ export class App {
   private applySettings(settings: Settings): void {
     this.settings = settings;
     saveSettings(this.store, settings);
+  }
+
+  /** The instrument panel is rebuilt in the new language; the menu redraws the screen it is showing. */
+  private applyLanguage(language: Language): void {
+    if (language === this.text.language) return;
+    saveLanguage(this.store, language);
+    this.text = messagesFor(language);
+    translatePage(this.text);
+    this.hud = new Hud(requireElement('hud', HTMLElement), this.text);
+    this.hud.showMission(this.session.mission);
+    this.menu.translate(this.text);
   }
 }

@@ -4,12 +4,6 @@ import type { Vec3 } from '../physics/vec3';
 
 export type CameraMode = 'cab' | 'orbit' | 'hook';
 
-export const CAMERA_LABELS: Readonly<Record<CameraMode, string>> = {
-  cab: 'Cabine',
-  orbit: 'Externa',
-  hook: 'Gancho',
-};
-
 const ORDER: readonly CameraMode[] = ['cab', 'orbit', 'hook'];
 const CAB_OFFSET = { along: 4.6, down: 1.7, side: 1.9 };
 const HOOK_VIEW_WIDTH = 9;

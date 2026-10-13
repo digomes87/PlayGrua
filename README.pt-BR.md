@@ -9,6 +9,10 @@ o parâmetro está em [`src/craneSpec.ts`](src/craneSpec.ts).
 
 Publicado em: <https://digomes87.github.io/PlayGrua/>
 
+A interface está disponível em inglês (o padrão) e em português do Brasil. As bandeiras no topo do
+menu alternam entre os dois, e a escolha fica guardada no navegador. Os nomes abaixo são os da
+interface em português.
+
 ## Rodar localmente
 
 Requer Node 22 ou mais novo.
@@ -247,6 +251,7 @@ src/
   craneSpec.ts   todos os valores de referência da grua
   physics/       núcleo físico puro e testável
   sim/           passo de simulação, colisões, lingada, missões, pontuação, replay
+  i18n/          idiomas da interface e o texto de cada um
   render/        cena Three.js, modelos procedurais, câmeras
   input/         teclado, gamepad, curvas de resposta
   ui/            painel de instrumentos, menus, áudio

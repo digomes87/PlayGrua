@@ -3,8 +3,10 @@ import {
   DEFAULT_SETTINGS,
   type KeyValueStore,
   loadBestResults,
+  loadLanguage,
   loadSettings,
   recordResult,
+  saveLanguage,
   saveSettings,
 } from '../src/sim/storage';
 
@@ -73,5 +75,28 @@ describe('settings', () => {
 
   test('report a failed save instead of throwing', () => {
     expect(saveSettings(brokenStore, DEFAULT_SETTINGS)).toBe(false);
+  });
+});
+
+describe('interface language', () => {
+  test('is English when nothing is stored', () => {
+    expect(loadLanguage(memoryStore())).toBe('en');
+  });
+
+  test('round-trips through the store', () => {
+    const store = memoryStore();
+
+    expect(saveLanguage(store, 'pt')).toBe(true);
+    expect(loadLanguage(store)).toBe('pt');
+  });
+
+  test('falls back to English on corrupted or unknown values', () => {
+    expect(loadLanguage(memoryStore({ 'playgrua.language.v1': '{not json' }))).toBe('en');
+    expect(loadLanguage(memoryStore({ 'playgrua.language.v1': '"fr"' }))).toBe('en');
+  });
+
+  test('does not throw when storage is unavailable', () => {
+    expect(loadLanguage(brokenStore)).toBe('en');
+    expect(saveLanguage(brokenStore, 'pt')).toBe(false);
   });
 });
