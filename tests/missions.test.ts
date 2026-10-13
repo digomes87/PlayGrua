@@ -28,8 +28,8 @@ const pickUpBlock = (session: Session): void => {
 };
 
 describe('mission catalogue', () => {
-  test('offers the five v1 missions', () => {
-    expect(MISSIONS.map((mission) => mission.id)).toEqual(['free', 'basic', 'limit', 'wind', 'precision']);
+  test('offers the v1 missions and the heavy lift', () => {
+    expect(MISSIONS.map((mission) => mission.id)).toEqual(['free', 'basic', 'limit', 'wind', 'precision', 'heavy']);
   });
 
   test('every load starts within reach, under capacity and clear of the site', () => {

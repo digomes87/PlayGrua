@@ -9,6 +9,7 @@ export interface MenuHandlers {
   readonly onStart: (mission: MissionId) => void;
   readonly onResume: () => void;
   readonly onSettings: (settings: Settings) => void;
+  readonly onReplay: () => void;
 }
 
 export interface MenuState {
@@ -125,6 +126,7 @@ export class Menu {
       element('p', 'mission-row__best', `Melhor: ${bestLabel(best, mission)}`),
       this.actions([
         ['Tentar de novo', () => this.handlers.onStart(mission.id), false],
+        ['Rever a operação', () => this.handlers.onReplay(), true],
         ['Missões', () => this.handlers.onResume(), true],
       ]),
     );

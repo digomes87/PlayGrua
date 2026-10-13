@@ -53,6 +53,10 @@ a carga precisa estar apoiada e o cabo aliviado (desça até a chave de cabo fro
 3. **Carga no limite**: 3 t até o raio em que o momento chega a 95 %, por 3 s, sem acionar o bloqueio.
 4. **Vento**: painel de forma de 12 m² com rajadas de até 40 km/h.
 5. **Precisão**: alvo de 0,5 m de raio com balanço menor que 2° no pouso.
+6. **Viga pesada**: 5 t na marcha lenta do guincho até o berço do outro lado da torre.
+
+Ao fim da missão, **Rever a operação** repete tudo a 4×. O replay não é um vídeo: a simulação é
+determinística, então ele roda a missão de novo com os comandos gravados e chega ao mesmo estado.
 
 A pontuação parte de 1000 e desconta tempo acima da referência, balanço máximo, velocidade de pouso,
 picos de momento e colisões. Sobrecarga acima de 110 % é falha grave. Os melhores resultados ficam no
@@ -161,7 +165,7 @@ esteja sobre ele: com o centro para fora da borda a carga não fica apoiada e ca
 
 ## Testes
 
-`npm test` roda 245 testes, entre eles os obrigatórios:
+`npm test` roda 250 testes, entre eles os obrigatórios:
 
 - período do pêndulo contra `2π√(L/g)` para cabos de 5, 20 e 40 m, erro abaixo de 1 %;
 - frequência do modo lento do pêndulo duplo contra a solução analítica, erro abaixo de 1 %;
@@ -187,7 +191,8 @@ colisões, missões, pontuação e persistência.
 - Colisões simplificadas: a carga é um prisma de base quadrada (média das duas dimensões, qualquer
   que seja a orientação). O cabo e a lança não colidem com os prédios.
 - Cargas apoiadas não são levadas pelo vento.
-- Sem modo fora de serviço completo e sem falhas de equipamento.
+- Sem modo fora de serviço completo, sem falhas de equipamento, sem gráfico de telemetria e sem
+  editor da especificação da grua na interface (os valores ficam em `src/craneSpec.ts`).
 
 ## Estrutura
 
