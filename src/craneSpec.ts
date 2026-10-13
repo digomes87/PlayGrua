@@ -15,6 +15,18 @@ export interface AeroSegment {
   readonly arm: number;
 }
 
+/** Tag lines: ropes from the ends of a long payload to riggers who hold its heading. */
+export interface TagLineSpec {
+  /** Hardest a rigger pulls on a line, N. */
+  readonly maxForce: number;
+  /** How firmly the riggers correct the heading, N·m per radian of error. */
+  readonly stiffness: number;
+  /** How firmly they resist turning, N·m·s per radian. */
+  readonly damping: number;
+  /** Greatest height of the payload above the riggers at which the lines still reach, m. */
+  readonly reach: number;
+}
+
 export interface HoistGear {
   readonly force: number;
   readonly reflectedMass: number;
@@ -108,6 +120,7 @@ export interface CraneSpec {
   };
   /** Distance from a forbidden zone at which the zoning system stops motion towards it, m. */
   readonly zoneMargin: number;
+  readonly tagLine: TagLineSpec;
   readonly windLimits: {
     readonly alert: number;
     readonly lockout: number;
@@ -212,6 +225,7 @@ export const DEFAULT_CRANE_SPEC: CraneSpec = {
     approachFactor: 0.25,
   },
   zoneMargin: 2,
+  tagLine: { maxForce: 250, stiffness: 900, damping: 900, reach: 20 },
   windLimits: {
     alert: kmhToMs(50),
     lockout: kmhToMs(72),

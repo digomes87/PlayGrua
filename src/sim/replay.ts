@@ -12,6 +12,7 @@ export class Replay {
   private readonly commands: Generator<CraneCommand>;
   private played = 0;
   private rigged = 0;
+  private tagged = 0;
 
   constructor(
     mission: Mission,
@@ -38,12 +39,16 @@ export class Replay {
     this.rigAsRecorded();
   }
 
-  /** Repeats the rigging toggles logged for the step about to run, each one once. */
+  /** Repeats the rigging and tag line toggles logged for the step about to run, each one once. */
   private rigAsRecorded(): void {
-    const { riggingAt } = this.recording;
+    const { riggingAt, tagLineAt } = this.recording;
     while (this.rigged < riggingAt.length && riggingAt[this.rigged] === this.played) {
       this.session.toggleRigging();
       this.rigged += 1;
+    }
+    while (this.tagged < tagLineAt.length && tagLineAt[this.tagged] === this.played) {
+      this.session.toggleTagLine();
+      this.tagged += 1;
     }
   }
 

@@ -19,6 +19,8 @@ export interface Slung extends Cargo {
   readonly payload: Payload;
   /** Hook point to payload centre of gravity with the slings taut. */
   readonly slingLength: number;
+  /** Heading the riggers hold with the tag lines, or null when nobody is on them. */
+  readonly tagHeading: number | null;
 }
 
 export interface RiggingState {
@@ -94,6 +96,7 @@ export function rig(state: RiggingState, spec: CraneSpec): RiggingState {
       body: { position: centre, velocity: ZERO, grounded: true },
       yaw: load.yaw,
       yawRate: 0,
+      tagHeading: null,
     },
     groundLoads: state.groundLoads.filter((candidate) => candidate !== load),
   };
@@ -115,4 +118,11 @@ export function unrig(state: RiggingState): RiggingState {
     cargo: null,
     groundLoads: [...state.groundLoads, { payload: cargo.payload, position: underside, yaw: cargo.yaw }],
   };
+}
+
+/** Riggers take up the tag lines at the payload's present heading, or let them go. */
+export function toggleTagLine(state: RiggingState): RiggingState {
+  const cargo = state.cargo;
+  if (cargo === null) return state;
+  return { ...state, cargo: { ...cargo, tagHeading: cargo.tagHeading === null ? cargo.yaw : null } };
 }

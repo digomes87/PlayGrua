@@ -14,10 +14,12 @@ export interface Recording {
   readonly segments: readonly Segment[];
   /** Step counts at which the rigging was toggled, before that step ran. */
   readonly riggingAt: readonly number[];
+  /** Step counts at which the tag lines were taken up or let go. */
+  readonly tagLineAt: readonly number[];
   readonly steps: number;
 }
 
-export const EMPTY_RECORDING: Recording = { segments: [], riggingAt: [], steps: 0 };
+export const EMPTY_RECORDING: Recording = { segments: [], riggingAt: [], tagLineAt: [], steps: 0 };
 
 const isSame = (first: CraneCommand, second: CraneCommand): boolean =>
   first.slew === second.slew &&
@@ -40,6 +42,11 @@ export function recordStep(recording: Recording, command: CraneCommand): Recordi
 export const recordRigging = (recording: Recording): Recording => ({
   ...recording,
   riggingAt: [...recording.riggingAt, recording.steps],
+});
+
+export const recordTagLine = (recording: Recording): Recording => ({
+  ...recording,
+  tagLineAt: [...recording.tagLineAt, recording.steps],
 });
 
 /** The demand of every step in order, expanded from the segments. */

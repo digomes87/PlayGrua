@@ -33,6 +33,7 @@ interface Latches {
 const RELEASED: Latches = { emergency: false, weathervane: false };
 
 interface Hazards {
+  readonly isTagLineHeld: boolean;
   readonly isZoneLimited: boolean;
   readonly isRopeFouled: boolean;
 }
@@ -47,6 +48,7 @@ function alarmsFor(instruments: Instruments, latches: Latches, hazards: Hazards)
     instruments.lmiStatus === 'warning' && { text: 'LMI · 90 % da capacidade', severity: 'warning', steady: false },
     instruments.windLevel === 'lockout' && { text: 'Vento acima de 72 km/h · operação bloqueada · V libera o giro', severity: 'danger', steady: false },
     instruments.windLevel === 'alert' && { text: 'Vento forte', severity: 'warning', steady: false },
+    hazards.isTagLineHeld && { text: 'Cabo-guia · sinaleiros segurando a carga', severity: 'warning', steady: true },
     latches.weathervane && { text: 'Cata-vento · freio de giro liberado', severity: 'warning', steady: true },
   ];
   return candidates.filter((alarm): alarm is Alarm => alarm !== false);
@@ -171,6 +173,7 @@ export class App {
     const { spec, site } = this.shown.config;
     const permits = zonePermits(this.shown.state.crane, site.zones, spec);
     return {
+      isTagLineHeld: this.shown.state.cargo?.tagHeading != null,
       isZoneLimited: Object.values(permits).includes(false),
       isRopeFouled: this.shown.progress.isRopeFouled,
     };
@@ -191,6 +194,7 @@ export class App {
     if (action === 'camera') return void this.view.nextCamera();
     if (action === 'restart') return this.start(this.session.mission.id);
     if (action === 'rigging') return void this.session.toggleRigging();
+    if (action === 'tagline') return void this.session.toggleTagLine();
     if (action === 'emergency') this.latches = { ...this.latches, emergency: !this.latches.emergency };
     if (action === 'weathervane') this.latches = { ...this.latches, weathervane: !this.latches.weathervane };
   }
