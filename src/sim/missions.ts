@@ -5,7 +5,7 @@ import { CALM, type WindConfig } from '../physics/wind';
 import { CONCRETE_BLOCK, FORMWORK_PANEL, PRECAST_BEAM, REBAR_BUNDLE } from './payloads';
 import type { GroundLoad } from './rigging';
 
-export type MissionId = 'free' | 'basic' | 'limit' | 'wind' | 'precision';
+export type MissionId = 'free' | 'basic' | 'limit' | 'wind' | 'precision' | 'heavy';
 
 export interface Zone {
   /** Centre on the supporting surface. */
@@ -124,6 +124,16 @@ export const MISSIONS: readonly Mission[] = [
     loads: [{ payload: CONCRETE_BLOCK, ...onGround(12, 0) }],
     goal: { kind: 'place', payloadId: CONCRETE_BLOCK.id, zone: { center: vec3(-14, 0, 14), radius: 0.5 }, maxTouchdownSwing: degToRad(2) },
     parSeconds: 240,
+  },
+  {
+    id: 'heavy',
+    title: 'Viga pesada',
+    briefing: 'Leve a viga de 5 t até o berço do outro lado da torre. Marcha lenta do guincho: cada tranco aparece no LMI.',
+    wind: CALM,
+    start: { radius: 6, hookHeight: 8, slewAngle: degToRad(20) },
+    loads: [{ payload: PRECAST_BEAM, ...onGround(8, 7) }],
+    goal: { kind: 'place', payloadId: PRECAST_BEAM.id, zone: { center: vec3(-12, 0, -12), radius: 1.5 }, maxTouchdownSwing: degToRad(4) },
+    parSeconds: 300,
   },
 ];
 

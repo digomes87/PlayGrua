@@ -12,10 +12,10 @@ async function startFreeTraining(page: Page): Promise<string[]> {
   return errors;
 }
 
-test('the menu lists the five missions', async ({ page }) => {
+test('the menu lists the six missions', async ({ page }) => {
   await page.goto('./');
 
-  await expect(page.locator('.mission-row')).toHaveCount(5);
+  await expect(page.locator('.mission-row')).toHaveCount(6);
   await expect(page.getByRole('button', { name: /Precisão/ })).toBeVisible();
 });
 

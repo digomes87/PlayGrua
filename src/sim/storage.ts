@@ -25,7 +25,7 @@ export const DEFAULT_SETTINGS: Settings = { expo: 0.5, deadzone: 0.08, muted: fa
 
 const BEST_KEY = 'playgrua.best.v1';
 const SETTINGS_KEY = 'playgrua.settings.v1';
-const MISSION_IDS: readonly MissionId[] = ['free', 'basic', 'limit', 'wind', 'precision'];
+const MISSION_IDS: readonly MissionId[] = ['free', 'basic', 'limit', 'wind', 'precision', 'heavy'];
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 

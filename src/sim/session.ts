@@ -6,6 +6,7 @@ import { FIXED_STEP } from '../physics/units';
 import { type Vec3, lerp } from '../physics/vec3';
 import type { Mission } from './missions';
 import { INITIAL_PROGRESS, type Progress, judgeRelease, track } from './progress';
+import { EMPTY_RECORDING, type Recording, recordRigging, recordStep } from './recording';
 import { canUnrig, reachableLoad, rig, unrig } from './rigging';
 import {
   type SimulationConfig,
@@ -35,6 +36,7 @@ interface Timeline {
   readonly leftover: number;
   readonly alpha: number;
   readonly progress: Progress;
+  readonly recording: Recording;
 }
 
 export class Session {
@@ -48,7 +50,7 @@ export class Session {
   ) {
     this.config = { spec, site, wind: mission.wind };
     const start = createSimulation(this.config, { ...mission.start, groundLoads: mission.loads });
-    this.timeline = { previous: start, current: start, leftover: 0, alpha: 0, progress: INITIAL_PROGRESS };
+    this.timeline = { previous: start, current: start, leftover: 0, alpha: 0, progress: INITIAL_PROGRESS, recording: EMPTY_RECORDING };
   }
 
   get state(): SimulationState {
@@ -57,6 +59,11 @@ export class Session {
 
   get progress(): Progress {
     return this.timeline.progress;
+  }
+
+  /** Everything needed to play this operation again. */
+  get recording(): Recording {
+    return this.timeline.recording;
   }
 
   /** Runs as many fixed steps as the frame time allows. */
@@ -103,7 +110,8 @@ export class Session {
   }
 
   private replace(state: SimulationState, action: RiggingAction): RiggingAction {
-    this.timeline = { ...this.timeline, previous: state, current: state };
+    const recording = recordRigging(this.timeline.recording);
+    this.timeline = { ...this.timeline, previous: state, current: state, recording };
     return action;
   }
 
@@ -111,6 +119,7 @@ export class Session {
     const { current, progress } = this.timeline;
     const result = stepSimulation(current, command, this.config, FIXED_STEP);
     const tracked = track(progress, this.mission, result.state, result.events, this.config.spec, FIXED_STEP);
-    this.timeline = { ...this.timeline, previous: current, current: result.state, progress: tracked };
+    const recording = recordStep(this.timeline.recording, command);
+    this.timeline = { ...this.timeline, previous: current, current: result.state, progress: tracked, recording };
   }
 }
