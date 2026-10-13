@@ -103,7 +103,11 @@ export interface CraneSpec {
     readonly cutoffRelease: number;
     readonly overload: number;
     readonly filterTime: number;
+    /** Speed factor applied from the warning threshold to the motions that raise the load moment. */
+    readonly approachFactor: number;
   };
+  /** Distance from a forbidden zone at which the zoning system stops motion towards it, m. */
+  readonly zoneMargin: number;
   readonly windLimits: {
     readonly alert: number;
     readonly lockout: number;
@@ -205,7 +209,9 @@ export const DEFAULT_CRANE_SPEC: CraneSpec = {
     cutoffRelease: 0.97,
     overload: 1.1,
     filterTime: 0.1,
+    approachFactor: 0.25,
   },
+  zoneMargin: 2,
   windLimits: {
     alert: kmhToMs(50),
     lockout: kmhToMs(72),
