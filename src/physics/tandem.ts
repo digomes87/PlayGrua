@@ -5,7 +5,8 @@
  * The payload also turns about the vertical axis under the wind and the weak heading given by the
  * two rope falls. Everything is integrated together with RK4 in the inertial frame.
  */
-import { type BoxShape, boxAero, yawInertia } from './aero';
+import type { TagLineSpec } from '../craneSpec';
+import { type BoxShape, boxAero, headingVector, yawInertia } from './aero';
 import { type StateVector, rk4Step } from './integrator';
 import {
   type CableMotion,
@@ -46,6 +47,41 @@ export interface TandemSurroundings {
   readonly friction: Friction;
   /** Heading of the jib, towards which the two rope falls turn the hook block. */
   readonly jibHeading: number;
+  /** Tag lines held by riggers, or null when the payload turns freely. */
+  readonly tagLine: HeldTagLine | null;
+}
+
+export interface HeldTagLine {
+  readonly spec: TagLineSpec;
+  /** Heading the riggers are holding the payload at. */
+  readonly heading: number;
+}
+
+interface TagPull {
+  readonly force: Vec3;
+  readonly yawTorque: number;
+}
+
+const NO_PULL: TagPull = { force: vec3(0, 0, 0), yawTorque: 0 };
+/** Tag lines run down to the riggers at about this slope, so a pull also loads the slings. */
+const LINE_SLOPE = 1;
+
+const wrapAngle = (angle: number): number => Math.atan2(Math.sin(angle), Math.cos(angle));
+
+/**
+ * Pull of the riggers on the tag lines. A rope only pulls, so the torque comes from one rigger
+ * hauling on the line at one end of the payload: it is limited by what a person can pull on half
+ * the payload length, and the same pull drags the payload sideways and downwards.
+ */
+function tagPull(held: HeldTagLine | null, props: CargoProps, cargo: Cargo): TagPull {
+  if (held === null) return NO_PULL;
+  const arm = Math.max(props.size.x, props.size.z) / 2;
+  const wanted = -(held.spec.stiffness * wrapAngle(cargo.yaw - held.heading) + held.spec.damping * cargo.yawRate);
+  const limit = held.spec.maxForce * arm;
+  const yawTorque = Math.min(Math.max(wanted, -limit), limit);
+  const pull = yawTorque / arm;
+  const sideways = scale(headingVector(cargo.yaw), -pull);
+  return { force: vec3(sideways.x, -Math.abs(pull) * LINE_SLOPE, sideways.z), yawTorque };
 }
 
 export interface TandemStep {
@@ -115,10 +151,11 @@ function forcesOn(rig: Rig, motion: CableMotion, state: Tandem): Forces {
     state.cargo.yaw,
     state.cargo.yawRate,
   );
+  const tag = tagPull(surroundings.tagLine, cargoProps, state.cargo);
   return {
     onHook: add(add(scale(rope.direction, -rope.tension), slingForce), add(hookAir, sway)),
-    onCargo: subtract(aero.force, slingForce),
-    yawTorque: aero.yawTorque + swivelTorque(rig, motion, rope.tension, state.cargo),
+    onCargo: add(subtract(aero.force, slingForce), tag.force),
+    yawTorque: aero.yawTorque + tag.yawTorque + swivelTorque(rig, motion, rope.tension, state.cargo),
     tension: rope.tension,
     slingTension: sling.tension,
   };

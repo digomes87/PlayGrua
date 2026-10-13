@@ -5,6 +5,7 @@ const ACTION_KEYS: Readonly<Record<string, Action>> = {
   KeyC: 'camera',
   Space: 'rigging',
   KeyE: 'rigging',
+  KeyT: 'tagline',
   KeyX: 'emergency',
   KeyV: 'weathervane',
   Escape: 'menu',

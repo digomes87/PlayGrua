@@ -6,8 +6,8 @@ import { FIXED_STEP } from '../physics/units';
 import { type Vec3, lerp } from '../physics/vec3';
 import type { Mission } from './missions';
 import { INITIAL_PROGRESS, type Progress, judgeRelease, track } from './progress';
-import { EMPTY_RECORDING, type Recording, recordRigging, recordStep } from './recording';
-import { canUnrig, reachableLoad, rig, unrig } from './rigging';
+import { EMPTY_RECORDING, type Recording, recordRigging, recordStep, recordTagLine } from './recording';
+import { canUnrig, reachableLoad, rig, toggleTagLine, unrig } from './rigging';
 import {
   type SimulationConfig,
   type SimulationState,
@@ -107,6 +107,15 @@ export class Session {
     const progress = judgeRelease(this.timeline.progress, this.mission, placed);
     this.timeline = { ...this.timeline, progress };
     return this.replace(released, 'released');
+  }
+
+  /** Riggers take up or let go the tag lines of the slung payload. Returns whether they hold them now. */
+  toggleTagLine(): boolean {
+    if (this.state.cargo === null) return false;
+    const state = { ...this.state, ...toggleTagLine(this.state) };
+    const recording = recordTagLine(this.timeline.recording);
+    this.timeline = { ...this.timeline, previous: state, current: state, recording };
+    return state.cargo?.tagHeading !== null;
   }
 
   private replace(state: SimulationState, action: RiggingAction): RiggingAction {

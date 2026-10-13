@@ -20,7 +20,7 @@ import {
   stretchedLength,
   swingAngle,
 } from '../physics/pendulum';
-import { stepTandem } from '../physics/tandem';
+import { type HeldTagLine, stepTandem } from '../physics/tandem';
 import { GRAVITY } from '../physics/units';
 import { type Vec3, ZERO, dot, normalize, scale, subtract, vec3 } from '../physics/vec3';
 import {
@@ -204,6 +204,13 @@ function moveHookAlone(
   };
 }
 
+/** The tag lines act only while they reach from the payload down to the riggers below it. */
+export function heldTagLine(cargo: Slung, surface: number, spec: CraneSpec): HeldTagLine | null {
+  const isInReach = cargo.body.position.y - surface <= spec.tagLine.reach;
+  if (cargo.tagHeading === null || !isInReach) return null;
+  return { spec: spec.tagLine, heading: cargo.tagHeading };
+}
+
 /** A payload standing on something also holds up a slack hook block that comes down on it. */
 const hookSupports = (obstacles: readonly Obstacle[], cargo: Slung): readonly Obstacle[] =>
   cargo.body.grounded ? [...obstacles, cargoObstacle(cargo)] : obstacles;
@@ -218,13 +225,15 @@ function moveTandem(
 ): Moved {
   const { spec } = config;
   const obstacles = obstaclesIn(state, config.site);
+  const cargoSupport = supportHeightBelow(obstacles, cargo.body, cargoFootprint(cargo));
   const surroundings = {
     hookWind: windVelocityAt(wind, config.wind, state.body.position.y),
     cargoWind: windVelocityAt(wind, config.wind, cargo.body.position.y),
     hookSupport: supportHeightBelow(hookSupports(obstacles, cargo), state.body, hookFootprint(spec)),
-    cargoSupport: supportHeightBelow(obstacles, cargo.body, cargoFootprint(cargo)),
+    cargoSupport,
     friction: spec.groundFriction,
     jibHeading: state.crane.slew.angle,
+    tagLine: heldTagLine(cargo, cargoSupport, spec),
   };
   const moved = stepTandem(state.body, cargo, hookMass(spec), cargoProps(cargo), spec.cable, motion, surroundings, step);
   const hookBump = resolveSideHits(obstacles, moved.hook, hookFootprint(spec));

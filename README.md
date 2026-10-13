@@ -29,6 +29,7 @@ npm run preview    # serve o build em /PlayGrua/
 | `↑` / `↓` | Guincho sobe / desce |
 | `Shift` | Modo fino (25 % da velocidade) |
 | `Espaço` ou `E` | Engatar a carga sob o gancho / soltar a carga apoiada |
+| `T` | Cabo-guia: os sinaleiros seguram a orientação da carga lingada (de novo solta) |
 | `C` | Trocar câmera: cabine, externa, gancho |
 | `H` | Buzina |
 | `X` | Parada de emergência (trava; `X` de novo rearma) |
@@ -37,7 +38,7 @@ npm run preview    # serve o build em /PlayGrua/
 
 Gamepad no padrão de cabine: analógico esquerdo X = giro, Y = carrinho; analógico direito Y =
 guincho (puxar sobe). `A` engata, `B` emergência, `X` buzina, `Y` câmera, `LB` modo fino, `RB`
-cata-vento. Curva expo e zona morta são ajustáveis no menu. Teclado e gamepad funcionam juntos.
+cata-vento, `RT` cabo-guia. Curva expo e zona morta são ajustáveis no menu. Teclado e gamepad funcionam juntos.
 
 O joystick comanda **velocidade alvo**, nunca posição. Soltar o comando não para a grua: cada eixo
 desacelera na sua rampa e a carga continua balançando.
@@ -147,6 +148,46 @@ contra-lança e no contrapeso gera torque de giro, e a grua tende a alinhar a la
 Alerta a partir de 50 km/h. Acima de 72 km/h a operação é bloqueada (só descer a carga continua
 permitido) e o operador deve liberar o giro com `V`.
 
+### Cabo-guia
+
+Cabos das pontas da carga até sinaleiros no chão (ou na laje abaixo dela). Com `T` eles passam a
+segurar a orientação que a carga tem naquele instante. Cabo só puxa, então o torque vem de um
+sinaleiro puxando numa ponta: é limitado a 250 N em meio comprimento da carga (500 N·m no painel de
+4 m), e o mesmo puxão arrasta a carga de lado e para baixo. Só alcançam até 20 m acima de quem os
+segura. Num vendaval de lado o painel escapa mesmo assim.
+
+### Validação do painel em vento
+
+O painel solto (600 kg, 4 × 3 m, 20 m de cabo) em vento constante, 10 min simulados:
+
+| Vento | Painel solto | Com cabo-guia |
+| --- | --- | --- |
+| 4 m/s (14 km/h) | estável: oscila 0,2° e 0,1 m | estável |
+| 6 a 10 m/s (22 a 36 km/h) | dá voltas completas e balança de lado até 12 a 15 m | orientação a menos de 5°, balanço abaixo de 0,5 m |
+| 11 m/s (40 km/h) | estável: 4° e 0,5 m | estável |
+
+O que foi verificado e o que não foi:
+
+- **Solução numérica: verificada.** A 120, 240 e 480 Hz o movimento é o mesmo enquanto ainda é
+  regular (diferença de orientação abaixo de 0,01 rad em 90 s), então a instabilidade é do modelo e
+  não do integrador. Há um teste para isso.
+- **Rotação do painel solto: coerente com a literatura.** O gancho é uma junta livre e a carga gira
+  em vento forte ([Mechanical Engineering Journal, 2020](https://doaj.org/article/33a4a32dab8b4893b0eade1762f7a8a5));
+  placas articuladas num eixo vertical passam de oscilar para girar continuamente acima de um momento
+  de inércia adimensional da ordem de 0,1 a 0,2
+  ([Bakhshandehrostami e Fernandes](https://apps-eprint4-l.ncl.ac.uk/249828)), e o painel no ar está
+  muito acima disso (dezenas, por uma estimativa simples da inércia adicional do ar).
+- **Amplitude do balanço lateral: não validada, e provavelmente exagerada.** Não achei medição de
+  painel suspenso em vento para comparar os 12 a 15 m. A aerodinâmica aqui é quase-estática, e em
+  placas que se movem livremente o torque medido é uma a duas ordens de grandeza menor que o de uma
+  placa em ângulo fixo ([Andersen, Pesavento e Wang, JFM 2005](https://dragonfly.tam.cornell.edu/publications/2005_JFM_Andersen_Pesavento_Wang_a.pdf)).
+  Tratar esse número como limite superior do modelo, não como previsão.
+- Uma correção teórica (incidência tomada a três quartos da corda) foi testada e não mudou o quadro;
+  não foi adotada.
+
+Na prática a faixa incerta é a do painel sem cabo-guia. Com os sinaleiros segurando, a carga fica na
+região em que o modelo é estável e o arrasto de frente (`½·ρ·Cd·A·v²`) é o que manda.
+
 ### Sistemas de segurança
 
 - **LMI**: a partir de 90 % subir carga e carrinho para fora ficam a 25 % da velocidade, para o
@@ -165,7 +206,7 @@ esteja sobre ele: com o centro para fora da borda a carga não fica apoiada e ca
 
 ## Testes
 
-`npm test` roda 250 testes, entre eles os obrigatórios:
+`npm test` roda 260 testes, entre eles os obrigatórios:
 
 - período do pêndulo contra `2π√(L/g)` para cabos de 5, 20 e 40 m, erro abaixo de 1 %;
 - frequência do modo lento do pêndulo duplo contra a solução analítica, erro abaixo de 1 %;
@@ -181,11 +222,11 @@ colisões, missões, pontuação e persistência.
 
 ## Limitações conhecidas
 
-- A aerodinâmica da carga é quase-estática. Num painel grande ela prevê oscilação acoplada de
-  orientação e balanço que cresce quando as duas frequências coincidem (perto de 8 m/s para o painel
-  de 12 m² em 24 m de cabo). O mecanismo é real, mas a amplitude não foi validada contra medição.
-- A carga gira só em torno da vertical: não tomba nem inclina além do ângulo das lingas. Não há
-  cabo-guia.
+- A aerodinâmica da carga é quase-estática. O balanço do painel solto entre 6 e 10 m/s não foi
+  validado contra medição e provavelmente está exagerado (ver "Validação do painel em vento").
+- A carga gira só em torno da vertical: não tomba nem inclina além do ângulo das lingas. O cabo-guia
+  é um torque limitado com a força correspondente, sem a geometria de cada cabo nem a posição dos
+  sinaleiros.
 - A flexibilidade da estrutura são duas molas: torção entre o acionamento de giro e a lança, e
   rigidez vertical em série com o cabo. A lança não tem modos de flexão próprios.
 - Colisões simplificadas: a carga é um prisma de base quadrada (média das duas dimensões, qualquer

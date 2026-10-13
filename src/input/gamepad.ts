@@ -20,7 +20,7 @@ export const CAB_LAYOUT: PadLayout = {
   hoistAxis: 3,
   fineButton: 4,
   hornButton: 2,
-  actionButtons: { 0: 'rigging', 1: 'emergency', 3: 'camera', 5: 'weathervane', 9: 'menu', 8: 'restart' },
+  actionButtons: { 0: 'rigging', 1: 'emergency', 3: 'camera', 5: 'weathervane', 7: 'tagline', 9: 'menu', 8: 'restart' },
 };
 
 /** The slice of the Gamepad API the mapping needs. */
