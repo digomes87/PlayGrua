@@ -5,6 +5,7 @@ import {
   type CraneLoads,
   type CraneState,
   createCrane,
+  jibDirection,
   jibTangent,
   stepCrane,
   trolleyPosition,
@@ -130,11 +131,19 @@ export function createSimulation(config: SimulationConfig, start: StartPose): Si
   };
 }
 
+/** Unit vector from the trolley down the rope to the hook block. */
+const ropeDirection = (state: SimulationState, spec: CraneSpec): Vec3 =>
+  normalize(subtract(state.body.position, trolleyPosition(state.crane, spec)));
+
 /** Generalised slew torque of the rope pulling on the trolley. */
 function ropeSlewTorque(state: SimulationState, spec: CraneSpec): number {
-  const toLoad = normalize(subtract(state.body.position, trolleyPosition(state.crane, spec)));
-  return state.crane.trolley.radius * state.tension * dot(toLoad, jibTangent(state.crane.slew.angle));
+  const across = dot(ropeDirection(state, spec), jibTangent(state.crane.slew.angle));
+  return state.crane.trolley.radius * state.tension * across;
 }
+
+/** Rope pull on the trolley along the jib. */
+const ropeTrolleyForce = (state: SimulationState, spec: CraneSpec): number =>
+  state.tension * dot(ropeDirection(state, spec), jibDirection(state.crane.slew.angle));
 
 function craneLoads(state: SimulationState, config: SimulationConfig, wind: WindState): CraneLoads {
   const jibWind = windVelocityAt(wind, config.wind, config.spec.geometry.trolleyHeight);
@@ -144,6 +153,7 @@ function craneLoads(state: SimulationState, config: SimulationConfig, wind: Wind
     suspendedMass: state.body.grounded ? 0 : suspendedMass(state, config.spec),
     payloadMass: state.cargo?.payload.mass ?? 0,
     cableTension: state.tension,
+    trolleyForce: ropeTrolleyForce(state, config.spec),
   };
 }
 

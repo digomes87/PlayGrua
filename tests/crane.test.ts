@@ -20,6 +20,7 @@ const HOOK_ONLY: CraneLoads = {
   suspendedMass: SPEC.masses.hookBlock,
   payloadMass: 0,
   cableTension: SPEC.masses.hookBlock * GRAVITY,
+  trolleyForce: 0,
 };
 
 function run(crane: CraneState, command: CraneCommand, seconds: number, loads: CraneLoads = HOOK_ONLY): CraneState {
