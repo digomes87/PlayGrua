@@ -214,5 +214,6 @@ O workflow [`deploy.yml`](.github/workflows/deploy.yml) testa, gera o build e pu
 a cada push na `main`. No repositório, em *Settings → Pages*, a fonte precisa estar em **GitHub
 Actions**. O `base` do Vite está configurado para `/PlayGrua/`.
 
-O fluxo de branches é gitflow: `feature/*` entra em `develop`, e `release/*` leva `develop` para a
-`main`.
+O fluxo de branches é gitflow com promoção automática: `feature/*` entra em `develop`; quando o CI
+de `develop` passa (tipos, testes e build), o job `promote` faz o merge em `main`, cria a tag da
+versão do `package.json` se ainda não existir e dispara o deploy. Ninguém faz push direto na `main`.
