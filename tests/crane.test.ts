@@ -165,7 +165,8 @@ describe('slew', () => {
     const stopped = run(turning, IDLE_COMMAND, 10);
 
     expect(justReleased.slew.rate).toBeGreaterThan(0.5 * turning.slew.rate);
-    expect(stopped.slew.rate).toBe(0);
+    expect(stopped.slew.driveRate).toBeCloseTo(0, 12);
+    expect(Math.abs(stopped.slew.rate)).toBeLessThan(0.1 * turning.slew.rate);
     expect(stopped.slew.angle).toBeGreaterThan(turning.slew.angle);
   });
 
@@ -179,8 +180,9 @@ describe('slew', () => {
   test('the holding brake resists moderate wind torque', () => {
     const held = run(createCrane(SPEC, 30, 20), IDLE_COMMAND, 20, { ...HOOK_ONLY, slewTorque: 1.0e5 });
 
-    expect(held.slew.angle).toBe(0);
-    expect(held.slew.rate).toBe(0);
+    expect(held.slew.driveRate).toBeCloseTo(0, 12);
+    expect(held.slew.angle).toBeGreaterThan(0);
+    expect(held.slew.angle).toBeLessThan(2 * (1.0e5 / SPEC.slew.torsionalStiffness));
   });
 
   test('the holding brake slips when the torque exceeds its capacity', () => {
@@ -206,7 +208,8 @@ describe('emergency stop', () => {
 
     const stopped = run(moving, { ...full, emergencyStop: true }, 6);
 
-    expect(stopped.slew.rate).toBe(0);
+    expect(stopped.slew.driveRate).toBeCloseTo(0, 12);
+    expect(Math.abs(stopped.slew.rate)).toBeLessThan(0.01);
     expect(stopped.trolley.speed).toBe(0);
     expect(stopped.hoist.rate).toBe(0);
   });
@@ -231,5 +234,52 @@ describe('geometry', () => {
     expect(position.x).toBeCloseTo(0, 9);
     expect(position.y).toBe(SPEC.geometry.trolleyHeight);
     expect(position.z).toBeCloseTo(30, 9);
+  });
+});
+
+describe('torsional flexibility of tower and jib', () => {
+  const start = createCrane(SPEC, 30, 20);
+  const steps = (seconds: number): number => seconds * PHYSICS_RATE_HZ;
+
+  test('the jib lags the drive while accelerating and catches up at constant speed', () => {
+    const accelerating = run(start, { ...IDLE_COMMAND, slew: 1 }, 3);
+    const cruising = run(start, { ...IDLE_COMMAND, slew: 1 }, 40);
+
+    expect(accelerating.slew.twist).toBeGreaterThan(0.0005);
+    expect(Math.abs(cruising.slew.twist)).toBeLessThan(0.0002);
+    expect(cruising.slew.rate).toBeCloseTo(cruising.slew.driveRate, 4);
+  });
+
+  test('after the brake closes the jib rings at the frequency of its inertia on the tower stiffness', () => {
+    let crane = run(run(start, { ...IDLE_COMMAND, slew: 1 }, 20), IDLE_COMMAND, 6);
+    const crossings: number[] = [];
+    let previous = crane.slew.rate;
+    for (let index = 1; index <= steps(20); index += 1) {
+      crane = stepCrane(crane, IDLE_COMMAND, HOOK_ONLY, SPEC, FIXED_STEP);
+      if (previous < 0 && crane.slew.rate >= 0) crossings.push(index * FIXED_STEP);
+      previous = crane.slew.rate;
+    }
+    const period = (crossings[crossings.length - 1]! - crossings[0]!) / (crossings.length - 1);
+    const expected = 2 * Math.PI * Math.sqrt(structureInertia(SPEC, 30) / SPEC.slew.torsionalStiffness);
+
+    expect(crane.slew.driveRate).toBeCloseTo(0, 12);
+    expect(crossings.length).toBeGreaterThan(3);
+    expect(Math.abs(period - expected) / expected).toBeLessThan(0.02);
+  });
+
+  test('the ringing dies out', () => {
+    const stopped = run(run(start, { ...IDLE_COMMAND, slew: 1 }, 20), IDLE_COMMAND, 6);
+    const later = run(stopped, IDLE_COMMAND, 60);
+    const energy = (crane: CraneState): number =>
+      0.5 * structureInertia(SPEC, 30) * crane.slew.rate ** 2 + 0.5 * SPEC.slew.torsionalStiffness * crane.slew.twist ** 2;
+
+    expect(energy(later)).toBeLessThan(0.01 * energy(stopped));
+  });
+
+  test('a steady torque on the jib winds it up by torque over stiffness against the brake', () => {
+    const held = run(start, IDLE_COMMAND, 120, { ...HOOK_ONLY, slewTorque: 1.0e5 });
+
+    expect(held.slew.angle).toBeCloseTo(1.0e5 / SPEC.slew.torsionalStiffness, 5);
+    expect(held.slew.twist).toBeCloseTo(-1.0e5 / SPEC.slew.torsionalStiffness, 5);
   });
 });

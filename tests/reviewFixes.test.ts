@@ -30,7 +30,8 @@ const spin = (mass: number, body: LoadBody): number =>
 /** Angular momentum about the tower axis, positive in the direction of increasing slew angle. */
 function angularMomentum(state: SimulationState): number {
   const cargo = state.cargo === null ? 0 : spin(state.cargo.payload.mass, state.cargo.body);
-  const jib = structureInertia(SPEC, state.crane.trolley.radius) * state.crane.slew.rate;
+  const drive = SPEC.slew.driveInertia * state.crane.slew.driveRate;
+  const jib = structureInertia(SPEC, state.crane.trolley.radius) * state.crane.slew.rate + drive;
   return jib + spin(SPEC.masses.hookBlock, state.body) + cargo;
 }
 
