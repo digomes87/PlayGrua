@@ -21,3 +21,46 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # Everything that reaches develop and passes the checks is released: merged into main, tagged
+  # with the package version and deployed. A push made with the workflow token does not start
+  # other workflows, so the deployment is dispatched explicitly.
+  promote:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    concurrency:
+      group: promote-main
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Merge the tested commit into main
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git merge-base --is-ancestor "$TESTED_SHA" HEAD; then
+            echo "main already contains $TESTED_SHA"
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git merge --no-ff "$TESTED_SHA" -m "Merge branch 'develop'"
+          version="v$(node -p "require('./package.json').version")"
+          if ! git rev-parse -q --verify "refs/tags/$version" > /dev/null; then
+            git tag -a "$version" -m "$version"
+          fi
+          git push origin main --follow-tags
+          echo "released=true" >> "$GITHUB_OUTPUT"
+        env:
+          TESTED_SHA: ${{ github.sha }}
+      - name: Deploy main
+        if: steps.merge.outputs.released == 'true'
+        run: gh workflow run deploy.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
