@@ -3,7 +3,7 @@ import type { CraneSpec } from '../craneSpec';
 import type { CraneCommand } from '../physics/crane';
 import { consumeFrame } from '../physics/integrator';
 import { FIXED_STEP } from '../physics/units';
-import { type Vec3, lerp, vec3 } from '../physics/vec3';
+import { type Vec3, lerp } from '../physics/vec3';
 import type { Mission } from './missions';
 import { INITIAL_PROGRESS, type Progress, judgeRelease, track } from './progress';
 import { canUnrig, reachableLoad, rig, unrig } from './rigging';
@@ -11,7 +11,6 @@ import {
   type SimulationConfig,
   type SimulationState,
   createSimulation,
-  hookPointAt,
   stepSimulation,
 } from './simulation';
 import type { Site } from './site';
@@ -23,9 +22,9 @@ const MAX_STEPS_PER_FRAME = 12;
 export interface RenderPose {
   readonly slewAngle: number;
   readonly radius: number;
-  /** Centre of gravity of whatever hangs from the rope. */
-  readonly centre: Vec3;
   readonly hook: Vec3;
+  /** Centre of gravity and heading of the slung payload. */
+  readonly cargo: { readonly position: Vec3; readonly yaw: number } | null;
 }
 
 export type RiggingAction = 'rigged' | 'released' | 'none';
@@ -70,12 +69,17 @@ export class Session {
   pose(): RenderPose {
     const { previous, current, alpha } = this.timeline;
     const blend = (from: number, to: number): number => from + (to - from) * alpha;
-    const slewAngle = blend(previous.crane.slew.angle, current.crane.slew.angle);
-    const radius = blend(previous.crane.trolley.radius, current.crane.trolley.radius);
-    const centre = lerp(previous.body.position, current.body.position, alpha);
-    const height = this.config.spec.geometry.trolleyHeight;
-    const pivot = vec3(radius * Math.cos(slewAngle), height, radius * Math.sin(slewAngle));
-    return { slewAngle, radius, centre, hook: hookPointAt(centre, pivot, current, this.config.spec) };
+    const before = previous.cargo ?? current.cargo;
+    const cargo =
+      current.cargo === null || before === null
+        ? null
+        : { position: lerp(before.body.position, current.cargo.body.position, alpha), yaw: blend(before.yaw, current.cargo.yaw) };
+    return {
+      slewAngle: blend(previous.crane.slew.angle, current.crane.slew.angle),
+      radius: blend(previous.crane.trolley.radius, current.crane.trolley.radius),
+      hook: lerp(previous.body.position, current.body.position, alpha),
+      cargo,
+    };
   }
 
   canRig(): boolean {
@@ -91,7 +95,7 @@ export class Session {
     const { spec } = this.config;
     if (this.canRig()) return this.replace({ ...this.state, ...rig(this.state, spec) }, 'rigged');
     if (!this.canRelease()) return 'none';
-    const released = { ...this.state, ...unrig(this.state, spec.masses.hookBlock, this.state.crane.slew.angle) };
+    const released = { ...this.state, ...unrig(this.state) };
     const placed = released.groundLoads[released.groundLoads.length - 1]!;
     const progress = judgeRelease(this.timeline.progress, this.mission, placed);
     this.timeline = { ...this.timeline, progress };

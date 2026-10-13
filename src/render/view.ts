@@ -77,8 +77,7 @@ export class SceneView {
         hook: pose.hook,
         ropeLength: state.crane.hoist.length,
         slewAngle: pose.slewAngle,
-        rigged: state.rigged,
-        isGrounded: state.body.grounded,
+        cargo: pose.cargo === null || state.cargo === null ? null : { ...pose.cargo, payload: state.cargo.payload },
       },
       state.groundLoads,
     );

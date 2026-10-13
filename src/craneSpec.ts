@@ -69,6 +69,13 @@ export interface CraneSpec {
     readonly dampingRatio: number;
     /** Light swing damping (rope hysteresis), 1/s. */
     readonly swingDamping: number;
+    /** Axial stiffness of the slings between hook and payload, N/m. */
+    readonly slingStiffness: number;
+    readonly slingDampingRatio: number;
+    /** Distance between the two rope falls, which gives the hook block a weak heading. */
+    readonly fallSpacing: number;
+    /** Friction of the hook swivel, N·m·s/rad. */
+    readonly swivelDamping: number;
   };
   readonly loadChart: readonly ChartPoint[];
   readonly lmi: {
@@ -158,6 +165,10 @@ export const DEFAULT_CRANE_SPEC: CraneSpec = {
     structureStiffness: 2.5e5,
     dampingRatio: 0.08,
     swingDamping: 0.004,
+    slingStiffness: 2.0e6,
+    slingDampingRatio: 0.2,
+    fallSpacing: 0.28,
+    swivelDamping: 15,
   },
   loadChart: LOAD_CHART,
   lmi: {
