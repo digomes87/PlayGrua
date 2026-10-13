@@ -1,260 +1,282 @@
 # PlayGrua
 
-Simulador de operação de grua torre que roda 100 % no navegador. Não é um jogo arcade: a grua tem
-inércia, a carga balança como um pêndulo de verdade, o limitador de momento bloqueia os movimentos e
-o vento empurra a carga e a lança. Quando houve dúvida entre jogável e realista, ficou o realista, e
-o parâmetro está em [`src/craneSpec.ts`](src/craneSpec.ts).
+**English** · [Português](README.pt-BR.md)
 
-Publicado em: <https://digomes87.github.io/PlayGrua/>
+A tower crane operation simulator that runs entirely in the browser. It is not an arcade game: the
+crane has inertia, the load swings like a real pendulum, the load moment limiter blocks motions and
+the wind pushes both the load and the jib. Wherever playable and realistic pulled in different
+directions, realistic won, and the parameter is in [`src/craneSpec.ts`](src/craneSpec.ts).
 
-## Rodar localmente
+Live at: <https://digomes87.github.io/PlayGrua/>
 
-Requer Node 22 ou mais novo.
+The interface is in Brazilian Portuguese. The terms used on screen are given in parentheses below
+where they help.
+
+## Running locally
+
+Requires Node 22 or newer.
 
 ```bash
 npm install
-npm run dev        # servidor de desenvolvimento
-npm test           # testes da física e da simulação (Vitest)
-npm run test:e2e   # testes no navegador: Chrome, Firefox e WebKit (npx playwright install firefox webkit)
-npm run build      # gera dist/
-npm run preview    # serve o build em /PlayGrua/
+npm run dev        # development server
+npm test           # physics and simulation tests (Vitest)
+npm run test:e2e   # browser tests: Chrome, Firefox and WebKit (npx playwright install firefox webkit)
+npm run build      # writes dist/
+npm run preview    # serves the build at /PlayGrua/
 ```
 
-## Controles
+## Controls
 
-| Teclado | Ação |
+| Keyboard | Action |
 | --- | --- |
-| `A` / `D` | Giro à esquerda / direita |
-| `W` / `S` | Carrinho para fora / para dentro |
-| `↑` / `↓` | Guincho sobe / desce |
-| `Shift` | Modo fino (25 % da velocidade) |
-| `Espaço` ou `E` | Engatar a carga sob o gancho / soltar a carga apoiada |
-| `T` | Cabo-guia: os sinaleiros seguram a orientação da carga lingada (de novo solta) |
-| `C` | Trocar câmera: cabine, externa, gancho |
-| `H` | Buzina |
-| `X` | Parada de emergência (trava; `X` de novo rearma) |
-| `V` | Modo cata-vento: libera o freio de giro |
-| `R` / `Esc` | Reiniciar a missão / menu |
+| `A` / `D` | Slew left / right |
+| `W` / `S` | Trolley out / in |
+| `↑` / `↓` | Hoist up / down |
+| `Shift` | Fine mode (25 % of the speed) |
+| `Space` or `E` | Sling the load under the hook / release the load once it is standing |
+| `T` | Tag lines: riggers hold the heading of the slung load (press again to let go) |
+| `C` | Cycle cameras: cab, external, hook |
+| `H` | Horn |
+| `X` | Emergency stop (latches; `X` again resets it) |
+| `V` | Weathervane mode: releases the slew brake |
+| `R` / `Esc` | Restart the mission / menu |
 
-Gamepad no padrão de cabine: analógico esquerdo X = giro, Y = carrinho; analógico direito Y =
-guincho (puxar sobe). `A` engata, `B` emergência, `X` buzina, `Y` câmera, `LB` modo fino, `RB`
-cata-vento, `RT` cabo-guia. Curva expo e zona morta são ajustáveis no menu. Teclado e gamepad funcionam juntos.
+Gamepad in the cab layout: left stick X slews and Y moves the trolley; right stick Y hoists (pull
+back to raise). `A` slings, `B` emergency stop, `X` horn, `Y` camera, `LB` fine mode, `RB`
+weathervane, `RT` tag lines. Expo curve and deadzone are adjustable in the menu. Keyboard and gamepad
+work together.
 
-O joystick comanda **velocidade alvo**, nunca posição. Soltar o comando não para a grua: cada eixo
-desacelera na sua rampa e a carga continua balançando.
+The joystick commands a **target speed**, never a position. Releasing it does not stop the crane:
+each axis decelerates on its ramp and the load keeps swinging.
 
-Para engatar, leve o gancho até 1,2 m do centro da carga e a no máximo 3 m acima dela; fora de centro
-a carga sai balançando. Para soltar,
-a carga precisa estar apoiada e o cabo aliviado (desça até a chave de cabo frouxo parar o guincho).
+To sling a load, bring the hook within 1.2 m of its centre and at most 3 m above it; an off-centre
+pick leaves the load swinging. To release it, the load must be standing and the rope slack (lower
+until the slack-rope switch stops the hoist).
 
-## Missões
+## Missions
 
-1. **Treino livre**: sem cronômetro, quatro cargas no pátio.
-2. **Içamento básico**: 2 t de ferragem a 12 m de raio até a laje a 30 m de altura.
-3. **Carga no limite**: 3 t até o raio em que o momento chega a 95 %, por 3 s, sem acionar o bloqueio.
-4. **Vento**: painel de forma de 12 m² com rajadas de até 40 km/h.
-5. **Precisão**: alvo de 0,5 m de raio com balanço menor que 2° no pouso.
-6. **Viga pesada**: 5 t na marcha lenta do guincho até o berço do outro lado da torre.
+1. **Free training** (Treino livre): no clock, four loads in the yard.
+2. **Basic lift** (Içamento básico): 2 t of rebar from 12 m radius onto the slab 30 m up.
+3. **Load at the limit** (Carga no limite): 3 t out to the radius where the moment reaches 95 %,
+   held for 3 s, without tripping the cutoff.
+4. **Wind** (Vento): a 12 m² formwork panel in gusts up to 40 km/h.
+5. **Precision** (Precisão): a 0.5 m radius target with less than 2° of swing at touchdown.
+6. **Heavy beam** (Viga pesada): 5 t in the slow hoist gear to the cradle on the far side of the tower.
 
-Ao fim da missão, **Rever a operação** repete tudo a 4×. O replay não é um vídeo: a simulação é
-determinística, então ele roda a missão de novo com os comandos gravados e chega ao mesmo estado.
+When a mission ends, **Rever a operação** replays it at 4×. The replay is not a video: the
+simulation is deterministic, so it runs the mission again from the recorded commands and reaches the
+same state.
 
-A pontuação parte de 1000 e desconta tempo acima da referência, balanço máximo, velocidade de pouso,
-picos de momento e colisões. Sobrecarga acima de 110 % é falha grave. Os melhores resultados ficam no
+The score starts at 1000 and loses points for time over par, maximum swing, landing speed, moment
+peaks and collisions. An overload above 110 % is a grave failure. Best results are kept in
 `localStorage`.
 
-## Modelo físico
+## Physical model
 
-Tudo em SI, em `src/physics`, sem dependência do Three.js. Passo fixo de 120 Hz desacoplado do
-framerate (acumulador), com o estado interpolado para a renderização. A simulação é determinística:
-mesma entrada e mesma semente de vento geram o mesmo estado, bit a bit.
+Everything is SI, in `src/physics`, with no dependency on Three.js. A fixed 120 Hz step is decoupled
+from the frame rate (accumulator), and the state is interpolated for rendering. The simulation is
+deterministic: the same input and the same wind seed give the identical state. This is tested on a
+single machine; identical results across different machines or JavaScript engines have not been
+checked.
 
-### Carga: pêndulo duplo
+### Load: a double pendulum
 
-Moitão e carga são duas massas. O cabo liga o carrinho ao moitão e as lingas ligam o moitão à carga;
-os dois são **mola-amortecedor que só traciona**. As equações são as de Newton no referencial
-inercial, em coordenadas cartesianas, integradas juntas por RK4:
+Hook block and payload are two masses. The rope joins the trolley to the hook block and the slings
+join the hook block to the payload; both are **spring-dampers that can only pull**. The equations
+are Newton's in the inertial frame, in Cartesian coordinates, integrated together with RK4:
 
 ```
-m₁·a₁ = m₁·g − T·d̂₁ + S·d̂₂ + arrasto do moitão − c·v⊥
+m₁·a₁ = m₁·g − T·d̂₁ + S·d̂₂ + hook block drag − c·v⊥
 m₂·a₂ = m₂·g − S·d̂₂ + F_aero(ψ)
-I_z·ψ̈ = M_aero(ψ) + M_cabo − c_destorcedor·ψ̇
+I_z·ψ̈ = M_aero(ψ) + M_rope − c_swivel·ψ̇
 T     = max(0, k·(|d₁| − L) + c_axial·d(|d₁| − L)/dt)
-k     = 1 / (1/(E·A/(L + L_fixo)) + 1/k_estrutura)
+k     = 1 / (1/(E·A/(L + L_fixed)) + 1/k_structure)
 ```
 
-onde `d₁` vai do carrinho ao moitão, `d₂` do moitão à carga, `L(t)` é o cabo desenrolado e `ψ` é a
-orientação da carga em torno da vertical. Como o ponto de suspensão se move de verdade (translação do
-carrinho e rotação da lança), as acelerações centrípeta e tangencial e o termo de Coriolis da variação
-de `L` aparecem sozinhos, sem hipótese de pequenos ângulos. Consequências que saem do modelo:
+where `d₁` runs from the trolley to the hook block, `d₂` from the hook block to the payload, `L(t)`
+is the rope paid out and `ψ` is the heading of the payload about the vertical. Because the
+suspension point really moves (trolley travel and jib rotation), the centripetal and tangential
+accelerations and the Coriolis term of the changing `L` appear by themselves, with no small-angle
+assumption. What follows from the model, with no special rule:
 
-- cabo ou linga frouxos não empurram: a carga cai livre ou fica apoiada;
-- içar com tranco gera pico de tensão, e o LMI mostra esse pico;
-- encurtar o cabo de uma carga balançando aumenta o ângulo de balanço;
-- o cabo e as lingas fazem ângulo entre si: carga leve em linga longa balança no modo lento do
-  pêndulo duplo, mais devagar que `2π√(L/g)` (frequência medida a menos de 1 % da analítica);
-- engatar fora de centro deixa a linga inclinada e a carga sai balançando.
+- a slack rope or sling does not push: the load falls freely or stays where it stands;
+- snatching a load produces a tension peak, and the LMI shows it;
+- shortening the rope of a swinging load widens its swing angle;
+- rope and slings make an angle with each other: a light load on long slings swings in the slow mode
+  of the double pendulum, slower than `2π√(L/g)` (measured frequency within 1 % of the analytic one);
+- an off-centre pick leaves the slings slanted and the load swings as it lifts.
 
-**Vento na carga.** Cada par de faces verticais é uma placa plana: força normal pela lei de
-Rayleigh-Kirchhoff, escalada para dar o `Cd` da carga de frente para o vento, aplicada num centro de
-pressão que anda para o bordo de ataque em baixa incidência. Por isso o arrasto depende da orientação
-(um painel de lado pega uma fração do vento) e o vento gira o painel até ficar atravessado. A carga
-não acompanha o giro da lança: só o torque fraco das duas quedas de cabo a realinha.
+**Wind on the payload.** Each pair of vertical faces is a flat plate: the normal force follows the
+Rayleigh-Kirchhoff law, scaled to give the payload's `Cd` when it faces the wind, and acts at a
+centre of pressure that moves towards the leading edge at low incidence. So the drag depends on the
+heading (a panel edge-on catches a fraction of the wind) and the wind turns the panel until it lies
+across the flow. The payload does not follow the slewing jib: only the weak torque of the two rope
+falls brings it back in line.
 
-No chão a carga tem atrito de Coulomb (μ estático 0,5, cinético 0,4): tração lateral pequena não a
-move, acima do limite ela é arrastada, e ela só sai do chão quando a componente vertical da tração
-passa do peso. Uma carga que pousa com velocidade lateral derrapa até o atrito pará-la.
+On the ground the load has Coulomb friction (static μ 0.5, kinetic 0.4): a small side pull does not
+move it, above the limit it is dragged, and it leaves the ground only when the vertical component of
+the pull exceeds its weight. A load that lands with sideways speed skids until friction stops it.
 
-### Atuadores
+### Drives
 
-Os três eixos usam o mesmo modelo de acionamento: o joystick move uma referência de velocidade em
-rampa, o motor a segue enquanto tiver força, e com o comando solto e a referência em zero o freio
-fecha, com capacidade limitada.
+All three axes share one drive model: the joystick moves a ramped speed reference, the motor follows
+it as far as its force allows, and with the joystick released and the reference at zero the brake
+closes, with limited capacity.
 
-- **Giro**: duas inércias ligadas pela torção de torre e lança. Motor e freio agem no acionamento;
-  vento e cabo agem na lança: `I(r)·ω̇ = τ_torção + τ_vento + τ_cabo − 2·m_carrinho·r·ṙ·ω`. A inércia
-  `I` é calculada das massas de lança, contra-lança, contrapeso e carrinho; a carga entra pela força
-  real do cabo no carrinho, então uma carga pesada na ponta atrasa a aceleração e uma carga balançando
-  puxa a lança. A lança atrasa na partida e fica vibrando depois que o freio fecha, com
-  `T = 2π√(I/K)` (cerca de 2,5 s) e 5 % de amortecimento. O motor satura em 220 kN·m e o freio em
-  300 kN·m, e vento forte o faz escorregar.
-- **Carrinho**: a componente do cabo ao longo da lança e a força centrífuga agem no carrinho. O
-  motor dá até 9 kN e o freio segura 14 kN; uma carga pesada balançando forte arrasta o carrinho.
-- **Guincho**: a tensão do cabo age no tambor. As marchas são limites de força (55 kN a 1,2 m/s,
-  106 kN a 0,6 m/s, a mesma potência), então um pico acima disso faz o guincho ceder em vez de subir.
-  Tem redução de velocidade antes dos fins de curso e chave de cabo frouxo.
-- **Emergência**: os três freios fecham na capacidade máxima.
+- **Slew**: two inertias joined by the torsion of tower and jib. Motor and brake act on the drive;
+  wind and rope act on the jib: `I(r)·ω̇ = τ_torsion + τ_wind + τ_rope − 2·m_trolley·r·ṙ·ω`. The
+  inertia `I` is computed from the masses of jib, counter-jib, counterweight and trolley; the load
+  enters through the real pull of the rope on the trolley, so a heavy load at the tip slows the
+  acceleration and a swinging load pulls the jib. The jib lags on starting and rings after the brake
+  closes, with `T = 2π√(I/K)` (about 2.5 s) and 5 % damping. The motor saturates at 220 kN·m and the
+  brake at 300 kN·m, and a strong wind makes it slip.
+- **Trolley**: the component of the rope pull along the jib and the centrifugal force act on the
+  trolley. The motor gives up to 9 kN and the brake holds 14 kN; a heavy load swinging hard drags
+  the trolley.
+- **Hoist**: the rope tension acts on the drum. The gears are force limits (55 kN at 1.2 m/s,
+  106 kN at 0.6 m/s, the same power), so a peak above them makes the hoist give way instead of
+  lifting. It slows down before its travel limits and has a slack-rope switch.
+- **Emergency stop**: all three brakes close at full capacity.
 
-### Tabela de carga e LMI
+### Load chart and LMI
 
-Tabela discreta interpolada: 8 t até 15 m e depois momento aproximadamente constante,
-`Q(r) ≈ 90/(r − 3,75)` t, fechando em 1,6 t a 60 m. A carga medida vem da tensão do cabo (carga +
-moitão + efeito dinâmico) por um filtro de 0,1 s.
+A discrete, interpolated table: 8 t up to 15 m, then roughly constant moment,
+`Q(r) ≈ 90/(r − 3.75)` t, closing at 1.6 t at 60 m. The measured load comes from the rope tension
+(payload + hook block + dynamic effect) through a 0.1 s filter.
 
-| Momento | Efeito |
+| Moment | Effect |
 | --- | --- |
-| 90 % | alarme sonoro e visual intermitente |
-| 100 % | bloqueia subir carga e carrinho para fora; descer e recolher continuam liberados |
-| 110 % | registrado como sobrecarga, falha grave na missão |
+| 90 % | intermittent audible and visual alarm |
+| 100 % | blocks hoisting up and trolleying out; lowering and trolleying in stay available |
+| 110 % | recorded as an overload, a grave failure in a mission |
 
-O bloqueio só é liberado abaixo de 97 %.
+The cutoff is only released below 97 %.
 
-### Vento
+### Wind
 
-Velocidade média mais rajadas por processo de Ornstein-Uhlenbeck com semente, direção que varia
-devagar e perfil de velocidade com a altura (lei de potência, expoente 0,15). Força na carga
-`F = ½·ρ·Cd·A·v²` com a velocidade relativa do ar e `Cd·A` por tipo de carga; o vento na lança, na
-contra-lança e no contrapeso gera torque de giro, e a grua tende a alinhar a lança a favor do vento.
-Alerta a partir de 50 km/h. Acima de 72 km/h a operação é bloqueada (só descer a carga continua
-permitido) e o operador deve liberar o giro com `V`.
+A mean speed plus gusts from a seeded Ornstein-Uhlenbeck process, a slowly veering direction and a
+speed profile with height (power law, exponent 0.15). The wind on jib, counter-jib and counterweight
+produces a slewing torque, and the crane tends to turn the jib downwind. The wind on the payload is
+described above. An alert sounds from 50 km/h. Above 72 km/h operation is locked out (only lowering
+the load stays available) and the operator must release the slew with `V`.
 
-### Cabo-guia
+### Tag lines
 
-Cabos das pontas da carga até sinaleiros no chão (ou na laje abaixo dela). Com `T` eles passam a
-segurar a orientação que a carga tem naquele instante. Cabo só puxa, então o torque vem de um
-sinaleiro puxando numa ponta: é limitado a 250 N em meio comprimento da carga (500 N·m no painel de
-4 m), e o mesmo puxão arrasta a carga de lado e para baixo. Só alcançam até 20 m acima de quem os
-segura. Num vendaval de lado o painel escapa mesmo assim.
+Ropes from the ends of the payload to riggers on the ground (or on the slab below it). With `T`
+they start holding the heading the payload has at that moment. A rope only pulls, so the torque
+comes from one rigger hauling on one end: it is limited to 250 N on half the payload length
+(500 N·m on the 4 m panel), and the same pull drags the payload sideways and down. The lines only
+reach 20 m above whoever holds them. Edge-on to a gale the panel still gets away.
 
-### Validação do painel em vento
+### Validation of the panel in wind
 
-O painel solto (600 kg, 4 × 3 m, 20 m de cabo) em vento constante, 10 min simulados:
+The free panel (600 kg, 4 × 3 m, 20 m of rope) in a steady wind, 10 simulated minutes:
 
-| Vento | Painel solto | Com cabo-guia |
+| Wind | Free panel | With tag lines |
 | --- | --- | --- |
-| 4 m/s (14 km/h) | estável: oscila 0,2° e 0,1 m | estável |
-| 6 a 10 m/s (22 a 36 km/h) | dá voltas completas e balança de lado até 12 a 15 m | orientação a menos de 5°, balanço abaixo de 0,5 m |
-| 11 m/s (40 km/h) | estável: 4° e 0,5 m | estável |
+| 4 m/s (14 km/h) | stable: hunts 0.2° and 0.1 m | not measured |
+| 6 to 10 m/s (22 to 36 km/h) | turns right round and sways sideways up to 12 to 15 m | heading within 5°, sway below 0.5 m |
+| 11 m/s (40 km/h) | stable: 4° and 0.5 m | stable |
 
-O que foi verificado e o que não foi:
+What was checked and what was not:
 
-- **Solução numérica: verificada.** A 120, 240 e 480 Hz o movimento é o mesmo enquanto ainda é
-  regular (diferença de orientação abaixo de 0,01 rad em 90 s), então a instabilidade é do modelo e
-  não do integrador. Há um teste para isso.
-- **Rotação do painel solto: coerente com a literatura.** O gancho é uma junta livre e a carga gira
-  em vento forte ([Mechanical Engineering Journal, 2020](https://doaj.org/article/33a4a32dab8b4893b0eade1762f7a8a5));
-  placas articuladas num eixo vertical passam de oscilar para girar continuamente acima de um momento
-  de inércia adimensional da ordem de 0,1 a 0,2
-  ([Bakhshandehrostami e Fernandes](https://apps-eprint4-l.ncl.ac.uk/249828)), e o painel no ar está
-  muito acima disso (dezenas, por uma estimativa simples da inércia adicional do ar).
-- **Amplitude do balanço lateral: não validada, e provavelmente exagerada.** Não achei medição de
-  painel suspenso em vento para comparar os 12 a 15 m. A aerodinâmica aqui é quase-estática, e em
-  placas que se movem livremente o torque medido é uma a duas ordens de grandeza menor que o de uma
-  placa em ângulo fixo ([Andersen, Pesavento e Wang, JFM 2005](https://dragonfly.tam.cornell.edu/publications/2005_JFM_Andersen_Pesavento_Wang_a.pdf)).
-  Tratar esse número como limite superior do modelo, não como previsão.
-- Uma correção teórica (incidência tomada a três quartos da corda) foi testada e não mudou o quadro;
-  não foi adotada.
+- **Numerical solution: verified.** At 120, 240 and 480 Hz the motion is the same while it is still
+  regular (heading difference below 0.01 rad after 90 s), so the instability belongs to the model,
+  not to the integrator. There is a test for it.
+- **Rotation of the free panel: consistent with the literature.** The hook is a free joint and the
+  load turns in strong wind ([Mechanical Engineering Journal, 2020](https://doaj.org/article/33a4a32dab8b4893b0eade1762f7a8a5));
+  plates hinged on a vertical axis go from fluttering to continuous rotation above a dimensionless
+  moment of inertia of the order of 0.1 to 0.2
+  ([Bakhshandehrostami and Fernandes](https://apps-eprint4-l.ncl.ac.uk/249828)), and the panel in
+  air is far above that (tens, by a simple estimate of the added inertia of the air).
+- **Amplitude of the sideways sway: not validated, and probably overestimated.** No measurement of
+  a panel hanging in wind was found to compare the 12 to 15 m against. The aerodynamics here are
+  quasi-static, and on plates that move freely the measured torque is one to two orders of magnitude
+  smaller than on a plate held at a fixed angle
+  ([Andersen, Pesavento and Wang, JFM 2005](https://dragonfly.tam.cornell.edu/publications/2005_JFM_Andersen_Pesavento_Wang_a.pdf)).
+  Treat that number as an upper bound of the model, not as a prediction.
+- A theoretical correction (incidence taken at three quarters of the chord) was tried and did not
+  change the picture; it was not adopted.
 
-Na prática a faixa incerta é a do painel sem cabo-guia. Com os sinaleiros segurando, a carga fica na
-região em que o modelo é estável e o arrasto de frente (`½·ρ·Cd·A·v²`) é o que manda.
+In practice the uncertain range is that of the panel without tag lines. With the riggers holding
+it, the load stays where the model is stable and the broadside drag (`½·ρ·Cd·A·v²`) dominates.
 
-### Sistemas de segurança
+### Safety systems
 
-- **LMI**: a partir de 90 % subir carga e carrinho para fora ficam a 25 % da velocidade, para o
-  bloqueio de 100 % chegar devagar e sem pico.
-- **Zoneamento**: o carrinho não entra em zona proibida (a rua além do tapume). O sistema recusa o
-  giro ou o carrinho que levaria o ponto de suspensão a menos de 2 m da zona, e deixa livre o
-  movimento de afastar.
-- **Cabo em estrutura**: se a reta do carrinho ao moitão atravessa um prédio, o painel alarma e a
-  missão conta como colisão. O cabo não dobra na quina: é só detecção.
+- **LMI**: from 90 % hoisting up and trolleying out run at 25 % of the speed, so the 100 % cutoff is
+  reached slowly and without a peak.
+- **Zoning**: the trolley does not enter a forbidden zone (the street beyond the fence). The system
+  refuses the slew or trolley motion that would bring the suspension point within 2 m of the zone
+  and leaves the motion away from it free.
+- **Rope against the structure**: if the straight line from the trolley to the hook block passes
+  through a building, the panel raises an alarm and the mission counts it as a collision. The rope
+  does not bend round the corner: this is detection only.
 
-### Colisões
+### Collisions
 
-Carga e moitão contra o chão, os prédios, as pilhas e as outras cargas, todos como blocos alinhados
-aos eixos. O topo de qualquer bloco é superfície de pouso, desde que o centro de gravidade da carga
-esteja sobre ele: com o centro para fora da borda a carga não fica apoiada e cai. Pouso acima de 0,5 m/s conta como brusco.
+Payload and hook block against the ground, the buildings, the stacks and the other loads, all as
+axis-aligned blocks. The top of any block is a landing surface, as long as the centre of gravity of
+the load is over it: with the centre past the edge the load is not supported and falls. A landing
+faster than 0.5 m/s counts as hard.
 
-## Testes
+## Tests
 
-`npm test` roda 260 testes, entre eles os obrigatórios:
+`npm test` runs 260 tests, including the required ones:
 
-- período do pêndulo contra `2π√(L/g)` para cabos de 5, 20 e 40 m, erro abaixo de 1 %;
-- frequência do modo lento do pêndulo duplo contra a solução analítica, erro abaixo de 1 %;
-- conservação de energia sem amortecimento nem atuação: deriva abaixo de 0,5 % em 60 s;
-- tabela de carga nos pontos tabelados e interpolação monotônica;
-- bloqueio do LMI a 100 %, isolado e com a grua em operação;
-- determinismo: duas execuções com a mesma entrada e semente dão estado idêntico.
+- pendulum period against `2π√(L/g)` for 5, 20 and 40 m of rope, error below 1 %;
+- slow-mode frequency of the double pendulum against the analytic solution, error below 1 %;
+- energy conservation with no damping and no actuation: drift below 0.5 % in 60 s;
+- load chart at the table points and monotonic interpolation;
+- LMI cutoff at 100 %, in isolation and with the crane working;
+- determinism: two runs with the same input and seed end in the identical state.
 
-Há também testes de conservação do momento angular de lança, moitão e carga com o giro livre
-(deriva abaixo de 1 % em 30 s), das três missões de pouso jogadas do início ao fim por um piloto
-automático, da vibração de torção da lança, dos limites de força dos acionamentos, atrito de solo, cabo frouxo, pico de carga no tranco, vento na carga, cata-vento,
-colisões, missões, pontuação e persistência.
+There are also tests for conservation of the angular momentum of jib, hook block and payload with
+the slew free (drift below 1 % in 30 s), four placing missions played from start to finish by a
+scripted pilot, the torsional ringing of the jib, the force limits of the drives, ground friction,
+slack rope, snatch load peaks, wind on the load, tag lines, weathervaning, zoning, collisions,
+replay, missions, scoring and persistence.
 
-## Limitações conhecidas
+## Known limitations
 
-- A aerodinâmica da carga é quase-estática. O balanço do painel solto entre 6 e 10 m/s não foi
-  validado contra medição e provavelmente está exagerado (ver "Validação do painel em vento").
-- A carga gira só em torno da vertical: não tomba nem inclina além do ângulo das lingas. O cabo-guia
-  é um torque limitado com a força correspondente, sem a geometria de cada cabo nem a posição dos
-  sinaleiros.
-- A flexibilidade da estrutura são duas molas: torção entre o acionamento de giro e a lança, e
-  rigidez vertical em série com o cabo. A lança não tem modos de flexão próprios.
-- Colisões simplificadas: a carga é um prisma de base quadrada (média das duas dimensões, qualquer
-  que seja a orientação). O cabo e a lança não colidem com os prédios.
-- Cargas apoiadas não são levadas pelo vento.
-- Sem modo fora de serviço completo, sem falhas de equipamento, sem gráfico de telemetria e sem
-  editor da especificação da grua na interface (os valores ficam em `src/craneSpec.ts`).
+- The payload aerodynamics are quasi-static. The sway of the free panel between 6 and 10 m/s has not
+  been validated against measurement and is probably overestimated (see "Validation of the panel in
+  wind").
+- The payload turns only about the vertical: it does not topple or tilt beyond the angle of the
+  slings. The tag lines are a limited torque with the matching force, without the geometry of each
+  line or the position of the riggers.
+- The flexibility of the structure is two springs: torsion between the slew drive and the jib, and a
+  vertical stiffness in series with the rope. The jib has no bending modes of its own.
+- Simplified collisions: the payload is a square-based prism (the mean of its two sides, whatever
+  its heading). Rope and jib do not collide with the buildings.
+- Loads standing on a surface are not moved by the wind.
+- No full out-of-service mode, no equipment failures, no telemetry chart and no editor for the crane
+  specification in the interface (the values live in `src/craneSpec.ts`).
+- The gamepad mapping is unit-tested but has not been tried with a physical controller.
 
-## Estrutura
+## Layout
 
 ```
 src/
-  craneSpec.ts   todos os valores de referência da grua
-  physics/       núcleo físico puro e testável
-  sim/           passo de simulação, colisões, lingada, missões, pontuação
-  render/        cena Three.js, modelos procedurais, câmeras
-  input/         teclado, gamepad, curvas de resposta
-  ui/            painel de instrumentos, menus, áudio
-tests/           testes Vitest
-e2e/             testes Playwright
+  craneSpec.ts   every reference value of the crane
+  physics/       pure, testable physics core
+  sim/           simulation step, collisions, rigging, missions, scoring, replay
+  render/        Three.js scene, procedural models, cameras
+  input/         keyboard, gamepad, response curves
+  ui/            instrument panel, menus, audio
+tests/           Vitest tests
+e2e/             Playwright tests
 ```
 
-## Deploy
+## Deployment
 
-O workflow [`deploy.yml`](.github/workflows/deploy.yml) testa, gera o build e publica no GitHub Pages
-a cada push na `main`. No repositório, em *Settings → Pages*, a fonte precisa estar em **GitHub
-Actions**. O `base` do Vite está configurado para `/PlayGrua/`.
+The [`deploy.yml`](.github/workflows/deploy.yml) workflow tests, builds and publishes `main` to
+GitHub Pages. In the repository, under *Settings → Pages*, the source must be **GitHub Actions**.
+The Vite `base` is set to `/PlayGrua/`.
 
-O fluxo de branches é gitflow com promoção automática: `feature/*` entra em `develop`; quando o CI
-de `develop` passa (tipos, testes e build), o job `promote` faz o merge em `main`, cria a tag da
-versão do `package.json` se ainda não existir e dispara o deploy. Ninguém faz push direto na `main`.
+Branches follow gitflow with automatic promotion: `feature/*` goes into `develop`; when the CI of
+`develop` passes (types, tests and build), the `promote` job merges it into `main`, creates the tag
+for the `package.json` version if it does not exist yet and starts the deployment. Nobody pushes to
+`main` directly.
+
+Documentation is written in English; [README.pt-BR.md](README.pt-BR.md) is kept as the Portuguese
+version and should be updated together with this file.
