@@ -80,7 +80,7 @@ describe('site collisions in the simulation', () => {
     });
 
     expect(hardest).toBeGreaterThan(0.3);
-    expect(moved.body.position.x + footprintOf(REBAR_BUNDLE)).toBeLessThanOrEqual(16 + 1e-9);
+    expect(moved.cargo!.body.position.x + footprintOf(REBAR_BUNDLE)).toBeLessThanOrEqual(16 + 1e-9);
   });
 
   test('a load can be landed on top of a building', () => {
@@ -119,15 +119,16 @@ describe('rigging', () => {
     expect(reachableLoad(high)).toBeUndefined();
   });
 
-  test('rigging moves the payload from the ground onto the hook', () => {
+  test('rigging puts the payload on the slings without moving the hook or the payload', () => {
     const rigged = rig(start, SPEC);
+    const cargo = rigged.cargo!;
 
-    expect(rigged.rigged?.payload).toBe(CONCRETE_BLOCK);
+    expect(cargo.payload).toBe(CONCRETE_BLOCK);
     expect(rigged.groundLoads).toHaveLength(0);
-    expect(rigged.body.grounded).toBe(true);
-    expect(rigged.rigged!.slingDepth).toBeGreaterThan(CONCRETE_BLOCK.size.y + SPEC.geometry.hookBlockHeight);
-    expect(rigged.body.position.y).toBeLessThan(rigged.rigged!.slingDepth);
-    expect(rigged.body.position.y).toBeGreaterThan(CONCRETE_BLOCK.size.y / 2);
+    expect(rigged.body).toBe(start.body);
+    expect(cargo.body.grounded).toBe(true);
+    expect(cargo.body.position.y).toBeCloseTo(CONCRETE_BLOCK.size.y / 2, 9);
+    expect(cargo.slingLength).toBeCloseTo(start.body.position.y - CONCRETE_BLOCK.size.y / 2, 6);
   });
 
   test('rigging with nothing in reach changes nothing', () => {

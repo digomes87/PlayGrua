@@ -15,11 +15,14 @@ import {
 } from 'three';
 import type { Vec3 } from '../physics/vec3';
 import type { Payload } from '../sim/payloads';
-import type { GroundLoad, Rigged } from '../sim/rigging';
+import type { GroundLoad } from '../sim/rigging';
 import { PALETTE } from './palette';
 
 const ROPE_POINTS = 14;
 const FALL_SPACING = 0.28;
+const SLING_LEGS = 4;
+/** Below this the hook is right on the payload and the slings have no direction to lean in. */
+const SLING_MIN_LENGTH = 1e-6;
 const DOWN = new Vector3(0, -1, 0);
 
 const PAYLOAD_COLOURS: Readonly<Record<string, number>> = {
@@ -35,8 +38,14 @@ export interface RigPose {
   /** Unstretched rope paid out, to draw the sag of a slack rope. */
   readonly ropeLength: number;
   readonly slewAngle: number;
-  readonly rigged: Rigged | null;
-  readonly isGrounded: boolean;
+  readonly cargo: CarriedPose | null;
+}
+
+export interface CarriedPose {
+  readonly payload: Payload;
+  /** Centre of gravity. */
+  readonly position: Vec3;
+  readonly yaw: number;
 }
 
 /** Payload mesh with its origin at the centre of the underside. */
@@ -51,13 +60,11 @@ function payloadMesh(payload: Payload): Mesh {
   return mesh;
 }
 
-/** Four sling legs from the hook (local origin) to the top corners of the payload. */
-function slingGeometry(payload: Payload, slingDepth: number): BufferGeometry {
-  const top = -(slingDepth - payload.size.y);
-  const corners = [-1, 1].flatMap((x) => [-1, 1].map((z) => [(x * payload.size.x) / 2, top, (z * payload.size.z) / 2]));
-  const points = corners.flatMap((corner) => [0, 0, 0, ...corner]);
-  return new BufferGeometry().setAttribute('position', new BufferAttribute(new Float32Array(points), 3));
-}
+/** Top corners of the payload in its own frame, where the sling legs attach. */
+const slingAnchors = (payload: Payload): Vector3[] =>
+  [-1, 1].flatMap((x) =>
+    [-1, 1].map((z) => new Vector3((x * payload.size.x) / 2, payload.size.y / 2, (z * payload.size.z) / 2)),
+  );
 
 /** Sag at mid-span of a rope longer than the straight distance (shallow parabola approximation). */
 const sagOf = (ropeLength: number, distance: number): number =>
@@ -82,9 +89,11 @@ export class RigModel {
       new MeshStandardMaterial({ color: PALETTE.hookBlock, roughness: 0.5, metalness: 0.3 }),
     );
     this.hookBlock.castShadow = true;
-    this.slings = new LineSegments(new BufferGeometry(), new LineBasicMaterial({ color: PALETTE.sling }));
-    this.carried.add(this.slings);
-    this.root.add(this.rope, this.hookBlock, this.carried);
+    const slingGeometry = new BufferGeometry();
+    slingGeometry.setAttribute('position', new BufferAttribute(new Float32Array(SLING_LEGS * 2 * 3), 3));
+    this.slings = new LineSegments(slingGeometry, new LineBasicMaterial({ color: PALETTE.sling }));
+    this.slings.frustumCulled = false;
+    this.root.add(this.rope, this.hookBlock, this.carried, this.slings);
   }
 
   update(pose: RigPose, groundLoads: readonly GroundLoad[]): void {
@@ -93,7 +102,7 @@ export class RigModel {
     this.drawRope(pivot, hook, pose);
     this.hookBlock.position.copy(hook).setY(hook.y + 0.3);
     this.hookBlock.rotation.y = -pose.slewAngle;
-    this.placeCarried(pivot, hook, pose);
+    this.placeCarried(hook, pose.cargo);
     this.placeStanding(groundLoads);
   }
 
@@ -114,31 +123,43 @@ export class RigModel {
     positions.needsUpdate = true;
   }
 
-  /** Hook, slings and payload hang as one rigid link in line with the rope. */
-  private placeCarried(pivot: Vector3, hook: Vector3, pose: RigPose): void {
-    this.carried.visible = pose.rigged !== null;
-    if (pose.rigged === null) {
+  /** The payload hangs from the hook on its slings, leaning with them and turned to its own heading. */
+  private placeCarried(hook: Vector3, cargo: CarriedPose | null): void {
+    this.carried.visible = cargo !== null;
+    this.slings.visible = cargo !== null;
+    if (cargo === null) {
       this.carriedId = '';
       return;
     }
-    this.swapCarried(pose.rigged);
-    const ropeDirection = pose.isGrounded ? DOWN : new Vector3().subVectors(hook, pivot).normalize();
-    const tilt = new Quaternion().setFromUnitVectors(DOWN, ropeDirection);
-    const yaw = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), -pose.slewAngle);
-    this.carried.position.copy(hook);
+    this.swapCarried(cargo.payload);
+    const centre = new Vector3(cargo.position.x, cargo.position.y, cargo.position.z);
+    const lean = new Vector3().subVectors(centre, hook);
+    const slingDirection = lean.length() > SLING_MIN_LENGTH && lean.y < 0 ? lean.normalize() : DOWN;
+    const tilt = new Quaternion().setFromUnitVectors(DOWN, slingDirection);
+    const yaw = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), -cargo.yaw);
+    this.carried.position.copy(centre);
     this.carried.quaternion.copy(tilt.multiply(yaw));
+    this.carried.updateMatrixWorld(true);
+    this.drawSlings(hook, cargo.payload);
   }
 
-  private swapCarried(rigged: Rigged): void {
-    const id = `${rigged.payload.id}:${rigged.slingDepth.toFixed(3)}`;
-    if (id === this.carriedId) return;
-    this.carriedId = id;
-    this.carried.children.filter((child) => child !== this.slings).forEach((child) => this.carried.remove(child));
-    const mesh = payloadMesh(rigged.payload);
-    mesh.position.y = -rigged.slingDepth;
+  private drawSlings(hook: Vector3, payload: Payload): void {
+    const positions = this.slings.geometry.getAttribute('position') as BufferAttribute;
+    slingAnchors(payload).forEach((anchor, index) => {
+      const corner = anchor.applyMatrix4(this.carried.matrixWorld);
+      positions.setXYZ(index * 2, hook.x, hook.y, hook.z);
+      positions.setXYZ(index * 2 + 1, corner.x, corner.y, corner.z);
+    });
+    positions.needsUpdate = true;
+  }
+
+  private swapCarried(payload: Payload): void {
+    if (payload.id === this.carriedId) return;
+    this.carriedId = payload.id;
+    this.carried.clear();
+    const mesh = payloadMesh(payload);
+    mesh.position.y = -payload.size.y / 2;
     this.carried.add(mesh);
-    this.slings.geometry.dispose();
-    this.slings.geometry = slingGeometry(rigged.payload, rigged.slingDepth);
   }
 
   private placeStanding(groundLoads: readonly GroundLoad[]): void {

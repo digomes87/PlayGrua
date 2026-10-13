@@ -1,4 +1,4 @@
-/** One deterministic world step: wind, interlocks, drives, load, collisions, LMI. */
+/** One deterministic world step: wind, interlocks, drives, hook block and payload, collisions, LMI. */
 import type { CraneSpec } from '../craneSpec';
 import {
   type CraneCommand,
@@ -17,9 +17,11 @@ import {
   type LoadBody,
   stepLoad,
   stretchedLength,
+  swingAngle,
 } from '../physics/pendulum';
+import { stepTandem } from '../physics/tandem';
 import { GRAVITY } from '../physics/units';
-import { type Vec3, ZERO, add, dot, normalize, scale, subtract, vec3 } from '../physics/vec3';
+import { type Vec3, ZERO, dot, normalize, scale, subtract, vec3 } from '../physics/vec3';
 import {
   type WindConfig,
   type WindState,
@@ -31,7 +33,7 @@ import {
 } from '../physics/wind';
 import { type Footprint, resolveSideHits, supportHeightBelow } from './collisions';
 import { footprintOf } from './payloads';
-import { type GroundLoad, type Rigged, asObstacle, centreOffset } from './rigging';
+import { type GroundLoad, type Slung, asObstacle, cargoObstacle, cargoProps } from './rigging';
 import type { Obstacle, Site } from './site';
 
 export interface SimulationConfig {
@@ -43,8 +45,10 @@ export interface SimulationConfig {
 export interface SimulationState {
   readonly time: number;
   readonly crane: CraneState;
+  /** The hook block. */
   readonly body: LoadBody;
-  readonly rigged: Rigged | null;
+  /** The payload on the slings, if any. */
+  readonly cargo: Slung | null;
   readonly groundLoads: readonly GroundLoad[];
   readonly wind: WindState;
   readonly lmi: LmiState;
@@ -70,51 +74,59 @@ export interface StartPose {
   readonly groundLoads: readonly GroundLoad[];
 }
 
+interface Moved {
+  readonly body: LoadBody;
+  readonly cargo: Slung | null;
+  readonly tension: number;
+  readonly events: StepEvents;
+}
+
 const HOOK_DRAG_AREA = 0.3;
 const HOOK_HALF_WIDTH = 0.3;
 
-const offsetIn = (state: SimulationState, spec: CraneSpec): number => centreOffset(state.rigged, spec.masses.hookBlock);
-
-/** Centre of gravity down to the underside of the hook block or of the slung payload. */
-const hangDepthIn = (state: SimulationState, spec: CraneSpec): number =>
-  state.rigged === null ? spec.geometry.hookBlockHeight : state.rigged.slingDepth - offsetIn(state, spec);
-
-export const hangingMass = (state: SimulationState, spec: CraneSpec): HangingMass => ({
-  mass: spec.masses.hookBlock + (state.rigged?.payload.mass ?? 0),
-  dragArea: HOOK_DRAG_AREA + (state.rigged?.payload.dragArea ?? 0),
-  hangDepth: hangDepthIn(state, spec),
+const hookMass = (spec: CraneSpec): HangingMass => ({
+  mass: spec.masses.hookBlock,
+  dragArea: HOOK_DRAG_AREA,
+  hangDepth: spec.geometry.hookBlockHeight,
 });
 
-const footprintIn = (state: SimulationState, spec: CraneSpec): Footprint => ({
-  halfWidth: state.rigged === null ? HOOK_HALF_WIDTH : footprintOf(state.rigged.payload),
-  hangDepth: hangDepthIn(state, spec),
+const hookFootprint = (spec: CraneSpec): Footprint => ({
+  halfWidth: HOOK_HALF_WIDTH,
+  hangDepth: spec.geometry.hookBlockHeight,
 });
 
-/** Hook point given the centre of gravity: up the rope while hanging, straight up while standing. */
-export function hookPointAt(centre: Vec3, pivot: Vec3, state: SimulationState, spec: CraneSpec): Vec3 {
-  const offset = offsetIn(state, spec);
-  if (state.body.grounded) return vec3(centre.x, centre.y + offset, centre.z);
-  return add(centre, scale(normalize(subtract(pivot, centre)), offset));
-}
+const cargoFootprint = (cargo: Slung): Footprint => ({
+  halfWidth: footprintOf(cargo.payload),
+  hangDepth: cargo.payload.size.y / 2,
+});
 
-export const hookPoint = (state: SimulationState, spec: CraneSpec): Vec3 =>
-  hookPointAt(state.body.position, trolleyPosition(state.crane, spec), state, spec);
+export const isCarrying = (state: SimulationState): boolean => state.cargo !== null && !state.cargo.body.grounded;
+
+/** Mass hanging from the rope right now: the hook block plus a payload that has left the ground. */
+export const suspendedMass = (state: SimulationState, spec: CraneSpec): number =>
+  spec.masses.hookBlock + (isCarrying(state) ? state.cargo!.payload.mass : 0);
+
+export const hookPoint = (state: SimulationState): Vec3 => state.body.position;
+
+/** Angle from the vertical of the line from the trolley to the payload, or to the empty hook. */
+export const loadSwing = (state: SimulationState, spec: CraneSpec): number =>
+  swingAngle(state.cargo?.body ?? state.body, trolleyPosition(state.crane, spec));
 
 export function createSimulation(config: SimulationConfig, start: StartPose): SimulationState {
   const upright = createCrane(config.spec, start.radius, start.hookHeight);
   const crane = { ...upright, slew: { ...upright.slew, angle: start.slewAngle } };
   const pivot = trolleyPosition(crane, config.spec);
-  const hookMass = config.spec.masses.hookBlock;
-  const drop = stretchedLength(config.spec.cable, hookMass, crane.hoist.length);
+  const mass = config.spec.masses.hookBlock;
+  const drop = stretchedLength(config.spec.cable, mass, crane.hoist.length);
   return {
     time: 0,
     crane,
     body: { position: vec3(pivot.x, pivot.y - drop, pivot.z), velocity: ZERO, grounded: false },
-    rigged: null,
+    cargo: null,
     groundLoads: start.groundLoads,
     wind: createWind(config.wind),
-    lmi: createLmi(hookMass),
-    tension: hookMass * GRAVITY,
+    lmi: createLmi(mass),
+    tension: mass * GRAVITY,
   };
 }
 
@@ -129,24 +141,21 @@ function craneLoads(state: SimulationState, config: SimulationConfig, wind: Wind
   const windTorque = slewWindTorque(config.spec.aero, jibWind, state.crane.slew.angle, state.crane.slew.rate);
   return {
     slewTorque: windTorque + ropeSlewTorque(state, config.spec),
-    suspendedMass: state.body.grounded ? 0 : hangingMass(state, config.spec).mass,
-    payloadMass: state.rigged?.payload.mass ?? 0,
+    suspendedMass: state.body.grounded ? 0 : suspendedMass(state, config.spec),
+    payloadMass: state.cargo?.payload.mass ?? 0,
     cableTension: state.tension,
   };
 }
 
-/**
- * Linear motion of the suspension point and pendulum length that joins the two crane states
- * exactly. `link` is the rigid hook-to-centre-of-gravity distance added to the rope.
- */
-function cableMotion(before: CraneState, after: CraneState, link: number, spec: CraneSpec, step: number): CableMotion {
+/** Linear motion of the suspension point and rope length that joins the two crane states exactly. */
+function cableMotion(before: CraneState, after: CraneState, spec: CraneSpec, step: number): CableMotion {
   const pivot = trolleyPosition(before, spec);
   return {
     pivot,
     pivotVelocity: scale(subtract(trolleyPosition(after, spec), pivot), 1 / step),
-    length: before.hoist.length + link,
+    length: before.hoist.length,
     lengthRate: (after.hoist.length - before.hoist.length) / step,
-    link,
+    link: 0,
   };
 }
 
@@ -158,6 +167,63 @@ export const obstaclesIn = (state: SimulationState, site: Site): readonly Obstac
 export const isWindLocked = (state: SimulationState, config: SimulationConfig): boolean =>
   windSpeed(state.wind, config.wind) >= config.spec.windLimits.lockout;
 
+function moveHookAlone(
+  state: SimulationState,
+  config: SimulationConfig,
+  wind: WindState,
+  motion: CableMotion,
+  step: number,
+): Moved {
+  const { spec } = config;
+  const obstacles = obstaclesIn(state, config.site);
+  const surroundings = {
+    windVelocity: windVelocityAt(wind, config.wind, state.body.position.y),
+    supportHeight: supportHeightBelow(obstacles, state.body, hookFootprint(spec)),
+    friction: spec.groundFriction,
+  };
+  const moved = stepLoad(state.body, hookMass(spec), spec.cable, motion, surroundings, step);
+  const bump = resolveSideHits(obstacles, moved.body, hookFootprint(spec));
+  return {
+    body: bump.body,
+    cargo: null,
+    tension: moved.tension,
+    events: { touchdownSpeed: moved.impactSpeed, bumpSpeed: bump.speed },
+  };
+}
+
+/** A payload standing on something also holds up a slack hook block that comes down on it. */
+const hookSupports = (obstacles: readonly Obstacle[], cargo: Slung): readonly Obstacle[] =>
+  cargo.body.grounded ? [...obstacles, cargoObstacle(cargo)] : obstacles;
+
+function moveTandem(
+  state: SimulationState,
+  cargo: Slung,
+  config: SimulationConfig,
+  wind: WindState,
+  motion: CableMotion,
+  step: number,
+): Moved {
+  const { spec } = config;
+  const obstacles = obstaclesIn(state, config.site);
+  const surroundings = {
+    hookWind: windVelocityAt(wind, config.wind, state.body.position.y),
+    cargoWind: windVelocityAt(wind, config.wind, cargo.body.position.y),
+    hookSupport: supportHeightBelow(hookSupports(obstacles, cargo), state.body, hookFootprint(spec)),
+    cargoSupport: supportHeightBelow(obstacles, cargo.body, cargoFootprint(cargo)),
+    friction: spec.groundFriction,
+    jibHeading: state.crane.slew.angle,
+  };
+  const moved = stepTandem(state.body, cargo, hookMass(spec), cargoProps(cargo), spec.cable, motion, surroundings, step);
+  const hookBump = resolveSideHits(obstacles, moved.hook, hookFootprint(spec));
+  const cargoBump = resolveSideHits(obstacles, moved.cargo.body, cargoFootprint(cargo));
+  return {
+    body: hookBump.body,
+    cargo: { ...cargo, ...moved.cargo, body: cargoBump.body },
+    tension: moved.tension,
+    events: { touchdownSpeed: moved.impactSpeed, bumpSpeed: Math.max(hookBump.speed, cargoBump.speed) },
+  };
+}
+
 export function stepSimulation(
   state: SimulationState,
   command: CraneCommand,
@@ -168,19 +234,23 @@ export function stepSimulation(
   const wind = stepWind(state.wind, config.wind, step);
   const gated = applyInterlocks(command, permitsFor(state.lmi.status), isWindLocked(state, config));
   const crane = stepCrane(state.crane, gated, craneLoads(state, config, wind), spec, step);
-  const obstacles = obstaclesIn(state, config.site);
-  const footprint = footprintIn(state, spec);
-  const surroundings = {
-    windVelocity: windVelocityAt(wind, config.wind, state.body.position.y),
-    supportHeight: supportHeightBelow(obstacles, state.body, footprint),
-    friction: spec.groundFriction,
-  };
-  const motion = cableMotion(state.crane, crane, offsetIn(state, spec), spec, step);
-  const moved = stepLoad(state.body, hangingMass(state, spec), spec.cable, motion, surroundings, step);
-  const bump = resolveSideHits(obstacles, moved.body, footprint);
+  const motion = cableMotion(state.crane, crane, spec, step);
+  const moved =
+    state.cargo === null
+      ? moveHookAlone(state, config, wind, motion, step)
+      : moveTandem(state, state.cargo, config, wind, motion, step);
   const lmi = updateLmi(state.lmi, { tension: moved.tension, radius: crane.trolley.radius }, spec, step);
   return {
-    state: { ...state, time: state.time + step, crane, body: bump.body, wind, lmi, tension: moved.tension },
-    events: { touchdownSpeed: moved.impactSpeed, bumpSpeed: bump.speed },
+    state: {
+      ...state,
+      time: state.time + step,
+      crane,
+      body: moved.body,
+      cargo: moved.cargo,
+      wind,
+      lmi,
+      tension: moved.tension,
+    },
+    events: moved.events,
   };
 }

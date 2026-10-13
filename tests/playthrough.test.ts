@@ -17,6 +17,12 @@ interface Flight {
   readonly tolerance: number;
 }
 
+/** Hook point down to the underside of the slung payload. */
+const slingDepth = (session: Session): number => {
+  const cargo = session.state.cargo;
+  return cargo === null ? 0 : cargo.slingLength + cargo.payload.size.y / 2;
+};
+
 /** Picks the mission payload, carries it over the zone and lands it there. */
 function fly(id: MissionId, flight: Flight): Session {
   const session = new Session(missionById(id), SPEC, DEFAULT_SITE);
@@ -25,7 +31,7 @@ function fly(id: MissionId, flight: Flight): Session {
   pickUp(session, load.position);
   hoistTo(session, flight.travelHeight);
   hover(session, { target: goal.zone.center, tolerance: 1, authority: 1 });
-  hoistTo(session, goal.zone.center.y + (session.state.rigged?.slingDepth ?? 0) + flight.approachGap);
+  hoistTo(session, goal.zone.center.y + slingDepth(session) + flight.approachGap);
   wait(session, 20);
   hover(session, { target: goal.zone.center, tolerance: flight.tolerance, authority: 0.25 });
   setDown(session, { target: goal.zone.center, tolerance: flight.tolerance, authority: 0.25 });
@@ -70,7 +76,7 @@ describe('missions played from start to finish', () => {
 
     hover(session, { target: vec3(20, 0, 5), tolerance: 0.2, authority: 1 });
 
-    expect(Math.hypot(hookPoint(session.state, SPEC).x - 20, hookPoint(session.state, SPEC).z - 5)).toBeLessThan(0.3);
+    expect(Math.hypot(hookPoint(session.state).x - 20, hookPoint(session.state).z - 5)).toBeLessThan(0.3);
     expect(session.state.groundLoads).toHaveLength(1);
     expect(session.progress.outcome).toBe('running');
   });

@@ -48,17 +48,18 @@ const isMoving = (session: Session): boolean =>
  * which takes the energy out of the swing the way an operator catches it.
  */
 export function hover(session: Session, plan: Hover, hoist = 0): void {
-  const hangingAt = (): Vec3 => subtract(flat(session.state.body.position), flat(trolleyPosition(session.state.crane, SPEC)));
+  const loadAt = (): Vec3 => flat((session.state.cargo?.body ?? session.state.body).position);
+  const hangingAt = (): Vec3 => subtract(loadAt(), flat(trolleyPosition(session.state.crane, SPEC)));
   let offset = hangingAt();
   const blend = FIXED_STEP / OFFSET_FILTER_TIME;
   for (let time = 0; time < TIME_LIMIT; time += FIXED_STEP) {
     const state = session.state;
     const pivot = flat(trolleyPosition(state.crane, SPEC));
-    const lag = subtract(flat(state.body.position), pivot);
+    const lag = subtract(loadAt(), pivot);
     offset = vec3(offset.x + (lag.x - offset.x) * blend, 0, offset.z + (lag.z - offset.z) * blend);
     const error = subtract(subtract(flat(plan.target), offset), pivot);
     const sway = subtract(lag, offset);
-    const loadError = subtract(flat(plan.target), flat(state.body.position));
+    const loadError = subtract(flat(plan.target), loadAt());
     const isThere = Math.hypot(loadError.x, loadError.z) < plan.tolerance && !isMoving(session);
     if (isThere && hoist === 0) return;
     const wanted = vec3(error.x * POSITION_GAIN + sway.x * SWAY_GAIN, 0, error.z * POSITION_GAIN + sway.z * SWAY_GAIN);
@@ -70,14 +71,14 @@ export function hover(session: Session, plan: Hover, hoist = 0): void {
       slew: clampTo(slewRate / SPEC.slew.maxRate, plan.authority),
       hoist,
     });
-    if (hoist < 0 && state.body.grounded) return;
+    if (hoist < 0 && (state.cargo?.body ?? state.body).grounded) return;
   }
 }
 
 /** Hoists or lowers to `height`, releasing the joystick early enough for the ramp to stop there. */
 export function hoistTo(session: Session, height: number): void {
   const coast = (): number => session.state.crane.hoist.rate ** 2 / (2 * SPEC.hoist.deceleration);
-  const hook = (): number => hookPoint(session.state, SPEC).y;
+  const hook = (): number => hookPoint(session.state).y;
   const isRaising = hook() < height;
   const isClose = (): boolean => (isRaising ? hook() + coast() >= height : hook() - coast() <= height);
   drive(session, { hoist: isRaising ? 1 : -1 }, isClose);
