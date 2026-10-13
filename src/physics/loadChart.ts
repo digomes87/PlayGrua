@@ -23,6 +23,8 @@ export interface MotionPermits {
   readonly hoistDown: boolean;
   readonly trolleyOut: boolean;
   readonly trolleyIn: boolean;
+  /** Speed factor for hoisting up and trolleying out: below 1 on the approach to the limit. */
+  readonly approachFactor: number;
 }
 
 /** Rated capacity at a radius: linear interpolation between table points, clamped at the ends. */
@@ -52,10 +54,14 @@ export function classify(thresholds: LmiThresholds, utilization: number, previou
   return 'normal';
 }
 
-/** At cutoff only the motions that reduce the load moment stay available. */
-export function permitsFor(status: LmiStatus): MotionPermits {
+/**
+ * From the warning threshold the motions that raise the load moment are slowed, so the cutoff is
+ * reached gently; at cutoff only the motions that reduce the moment stay available.
+ */
+export function permitsFor(status: LmiStatus, thresholds: LmiThresholds): MotionPermits {
   const free = !isBlocking(status);
-  return { hoistUp: free, hoistDown: true, trolleyOut: free, trolleyIn: true };
+  const approachFactor = status === 'warning' ? thresholds.approachFactor : 1;
+  return { hoistUp: free, hoistDown: true, trolleyOut: free, trolleyIn: true, approachFactor };
 }
 
 export const createLmi = (measuredLoad: number): LmiState => ({ measuredLoad, utilization: 0, status: 'normal' });

@@ -20,6 +20,9 @@ export interface Progress {
   readonly touchdownSwing: number;
   readonly holdTime: number;
   readonly inContact: boolean;
+  /** Times the rope came to rest against a building. */
+  readonly ropeContacts: number;
+  readonly isRopeFouled: boolean;
   readonly wasBlocked: boolean;
   readonly outcome: Outcome;
   readonly message: string;
@@ -42,6 +45,8 @@ export const INITIAL_PROGRESS: Progress = {
   touchdownSwing: Number.POSITIVE_INFINITY,
   holdTime: 0,
   inContact: false,
+  ropeContacts: 0,
+  isRopeFouled: false,
   wasBlocked: false,
   outcome: 'running',
   message: '',
@@ -69,6 +74,15 @@ function trackBumps(progress: Progress, events: StepEvents): Progress {
   const inContact = events.bumpSpeed > BUMP_THRESHOLD;
   const isNewHit = inContact && !progress.inContact;
   return { ...progress, inContact, collisions: progress.collisions + (isNewHit ? 1 : 0) };
+}
+
+function trackRope(progress: Progress, events: StepEvents): Progress {
+  const isNewContact = events.ropeFouled && !progress.isRopeFouled;
+  return {
+    ...progress,
+    isRopeFouled: events.ropeFouled,
+    ropeContacts: progress.ropeContacts + (isNewContact ? 1 : 0),
+  };
 }
 
 function trackLmi(progress: Progress, state: SimulationState): Progress {
@@ -119,7 +133,7 @@ export function track(
   const timed = { ...progress, elapsed: progress.elapsed + step };
   const swung = trackSwing(timed, state, spec);
   const landed = trackLanding(swung, state, events, spec);
-  const tracked = trackLmi(trackBumps(landed, events), state);
+  const tracked = trackLmi(trackRope(trackBumps(landed, events), events), state);
   return judgeStep(tracked, mission.goal, state, step);
 }
 

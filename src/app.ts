@@ -6,10 +6,13 @@ import { Keyboard } from './input/keyboard';
 import type { CraneCommand } from './physics/crane';
 import { CAMERA_LABELS } from './render/cameras';
 import { SceneView } from './render/view';
+import { PHYSICS_RATE_HZ } from './physics/units';
 import { type MissionId, missionById } from './sim/missions';
+import { Replay } from './sim/replay';
 import { scoreOf } from './sim/scoring';
 import { Session } from './sim/session';
 import { DEFAULT_SITE } from './sim/site';
+import { zonePermits } from './sim/zoning';
 import { type BestResults, type Settings, browserStore, loadBestResults, loadSettings, recordResult, saveSettings } from './sim/storage';
 import { CabAudio } from './ui/audio';
 import { requireElement } from './ui/dom';
@@ -19,6 +22,8 @@ import { Menu } from './ui/menu';
 
 const MAX_FRAME_SECONDS = 0.25;
 const MILLISECONDS = 1000;
+/** A replay runs this many times faster than the operation it shows. */
+const REPLAY_SPEED = 4;
 
 interface Latches {
   readonly emergency: boolean;
@@ -27,9 +32,16 @@ interface Latches {
 
 const RELEASED: Latches = { emergency: false, weathervane: false };
 
-function alarmsFor(instruments: Instruments, latches: Latches): readonly Alarm[] {
+interface Hazards {
+  readonly isZoneLimited: boolean;
+  readonly isRopeFouled: boolean;
+}
+
+function alarmsFor(instruments: Instruments, latches: Latches, hazards: Hazards): readonly Alarm[] {
   const candidates: readonly (Alarm | false)[] = [
     latches.emergency && { text: 'Parada de emergência · X para rearmar', severity: 'danger', steady: true },
+    hazards.isRopeFouled && { text: 'Cabo encostado na estrutura', severity: 'danger', steady: false },
+    hazards.isZoneLimited && { text: 'Limite de zona · movimento bloqueado', severity: 'warning', steady: true },
     instruments.lmiStatus === 'overload' && { text: 'Sobrecarga acima de 110 %', severity: 'danger', steady: false },
     instruments.lmiStatus === 'cutoff' && { text: 'LMI · bloqueio: só descer ou recolher', severity: 'danger', steady: false },
     instruments.lmiStatus === 'warning' && { text: 'LMI · 90 % da capacidade', severity: 'warning', steady: false },
@@ -55,6 +67,7 @@ export class App {
   private lastFrame = 0;
   private isReported = false;
   private isBackdropDrawn = false;
+  private replay: Replay | null = null;
 
   constructor() {
     const canvas = requireElement('scene', HTMLCanvasElement);
@@ -66,6 +79,7 @@ export class App {
       onStart: (mission) => this.start(mission),
       onResume: () => this.resume(),
       onSettings: (settings) => this.applySettings(settings),
+      onReplay: () => this.startReplay(),
     });
     this.session = this.load('free');
     window.addEventListener('resize', () => {
@@ -86,7 +100,7 @@ export class App {
     this.lastFrame = time;
     const input = mergeInputs(this.keyboard.read(), this.gamepad.read(this.settings));
     input.actions.forEach((action) => this.perform(action));
-    if (!this.menu.isOpen) this.simulate(elapsed, input);
+    if (!this.menu.isOpen) this.advance(elapsed, input);
     this.draw();
     this.refresh(input);
     requestAnimationFrame((next) => this.frame(next));
@@ -96,7 +110,32 @@ export class App {
   private draw(): void {
     if (this.menu.isOpen && this.isBackdropDrawn) return;
     this.isBackdropDrawn = this.menu.isOpen;
-    this.view.render(this.session);
+    this.view.render(this.shown);
+  }
+
+  /** The session on screen: the replay while one runs, the live operation otherwise. */
+  private get shown(): Session {
+    return this.replay?.session ?? this.session;
+  }
+
+  private advance(elapsed: number, input: DeviceInput): void {
+    if (this.replay === null) return this.simulate(elapsed, input);
+    this.replay.advance(Math.round(elapsed * PHYSICS_RATE_HZ * REPLAY_SPEED));
+    if (this.replay.isFinished) this.endReplay();
+  }
+
+  private startReplay(): void {
+    const { mission, config, recording } = this.session;
+    this.replay = new Replay(mission, config.spec, config.site, recording);
+    this.isBackdropDrawn = false;
+    this.menu.hide();
+    this.hud.visible = true;
+  }
+
+  private endReplay(): void {
+    this.replay = null;
+    this.isBackdropDrawn = false;
+    this.report();
   }
 
   private simulate(elapsed: number, input: DeviceInput): void {
@@ -111,7 +150,7 @@ export class App {
   }
 
   private refresh(input: DeviceInput): void {
-    const instruments = readInstruments(this.session.state, this.session.config);
+    const instruments = readInstruments(this.shown.state, this.shown.config);
     const lmi = instruments.lmiStatus === 'normal' ? 'off' : instruments.lmiStatus === 'warning' ? 'warning' : 'cutoff';
     this.audio.update({
       lmi: this.menu.isOpen ? 'off' : lmi,
@@ -121,21 +160,33 @@ export class App {
     });
     this.hud.update({
       instruments,
-      alarms: alarmsFor(instruments, this.latches),
-      elapsed: this.session.progress.elapsed,
+      alarms: alarmsFor(instruments, this.latches, this.hazards()),
+      elapsed: this.shown.progress.elapsed,
       hint: this.hint(),
       cameraLabel: CAMERA_LABELS[this.view.cameraMode],
     });
   }
 
+  private hazards(): Hazards {
+    const { spec, site } = this.shown.config;
+    const permits = zonePermits(this.shown.state.crane, site.zones, spec);
+    return {
+      isZoneLimited: Object.values(permits).includes(false),
+      isRopeFouled: this.shown.progress.isRopeFouled,
+    };
+  }
+
   private hint(): string {
+    if (this.replay !== null) return `Replay ${REPLAY_SPEED}× · ${Math.round(this.replay.progress * 100)} % · Esc encerra`;
     if (this.session.canRig()) return 'Espaço: engatar a carga';
     if (this.session.canRelease()) return 'Espaço: soltar a carga';
     return this.session.progress.message;
   }
 
   private perform(action: Action): void {
+    if (action === 'menu' && this.replay !== null) return this.endReplay();
     if (action === 'menu') return this.toggleMenu();
+    if (this.replay !== null && action !== 'camera') return;
     if (this.menu.isOpen) return;
     if (action === 'camera') return void this.view.nextCamera();
     if (action === 'restart') return this.start(this.session.mission.id);

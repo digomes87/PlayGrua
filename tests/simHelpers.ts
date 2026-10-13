@@ -13,7 +13,7 @@ import {
 } from '../src/sim/simulation';
 import { SPEC } from './helpers';
 
-export const OPEN_FIELD: SimulationConfig = { spec: SPEC, wind: CALM, site: { obstacles: [] } };
+export const OPEN_FIELD: SimulationConfig = { spec: SPEC, wind: CALM, site: { obstacles: [], zones: [] } };
 
 export const GUSTY: WindConfig = {
   ...CALM,

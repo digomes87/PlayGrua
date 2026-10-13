@@ -1,12 +1,23 @@
 /** Buildings under construction and material stacks, generated from the site obstacles. */
-import { BoxGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, type Object3D } from 'three';
-import type { Obstacle, Site } from '../sim/site';
+import {
+  BoxGeometry,
+  Group,
+  InstancedMesh,
+  Matrix4,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  type Object3D,
+  PlaneGeometry,
+} from 'three';
+import type { ForbiddenZone, Obstacle, Site } from '../sim/site';
 import { PALETTE } from './palette';
 
 const STOREY_HEIGHT = 3;
 const SLAB_THICKNESS = 0.3;
 const COLUMN_SIZE = 0.45;
 const COLUMN_SPACING = 6;
+const ZONE_PAINT_HEIGHT = 0.05;
 
 const STACK_COLOURS: Readonly<Record<string, number>> = {
   'stack-timber': PALETTE.timber,
@@ -74,8 +85,22 @@ function buildStack(obstacle: Obstacle): Object3D {
   return stack;
 }
 
+/** Forbidden zone painted on the ground. */
+function buildZone(zone: ForbiddenZone): Object3D {
+  const width = zone.maxX - zone.minX;
+  const depth = zone.maxZ - zone.minZ;
+  const paint = new Mesh(
+    new PlaneGeometry(width, depth),
+    new MeshBasicMaterial({ color: PALETTE.forbidden, transparent: true, opacity: 0.28, depthWrite: false }),
+  );
+  paint.rotation.x = -Math.PI / 2;
+  paint.position.set((zone.minX + zone.maxX) / 2, ZONE_PAINT_HEIGHT, (zone.minZ + zone.maxZ) / 2);
+  return paint;
+}
+
 export function buildSite(site: Site): Group {
   const group = new Group();
+  site.zones.forEach((zone) => group.add(buildZone(zone)));
   site.obstacles.forEach((obstacle) => {
     group.add(obstacle.kind === 'building' ? buildFrame(obstacle) : buildStack(obstacle));
   });

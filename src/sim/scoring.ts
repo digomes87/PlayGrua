@@ -46,7 +46,11 @@ export function scoreLines(progress: Progress, mission: Mission): readonly Score
       value: `${(progress.peakUtilization * 100).toFixed(0)} %`,
       penalty: momentExcess * SCORING.perUtilization + progress.cutoffs * SCORING.perCutoff,
     },
-    { label: 'Colisões', value: `${progress.collisions}`, penalty: progress.collisions * SCORING.perCollision },
+    {
+      label: 'Colisões e cabo em estrutura',
+      value: `${progress.collisions + progress.ropeContacts}`,
+      penalty: (progress.collisions + progress.ropeContacts) * SCORING.perCollision,
+    },
   ];
 }
 

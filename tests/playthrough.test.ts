@@ -71,6 +71,15 @@ describe('missions played from start to finish', () => {
     expect(session.progress.hardLandings).toBe(0);
   });
 
+  test('heavy lift: the 5 t beam crosses to the far cradle in the slow gear without tripping the LMI', () => {
+    const session = fly('heavy', { travelHeight: 9, approachGap: 1.5, tolerance: 0.4 });
+
+    expect(session.progress.outcome).toBe('success');
+    expect(session.progress.cutoffs).toBe(0);
+    expect(session.progress.peakUtilization).toBeLessThan(1);
+    expect(session.progress.collisions + session.progress.ropeContacts).toBe(0);
+  });
+
   test('the pilot only ever acts through the hook: an empty hook hover leaves the load alone', () => {
     const session = new Session(missionById('basic'), SPEC, DEFAULT_SITE);
 

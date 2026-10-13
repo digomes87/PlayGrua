@@ -70,7 +70,7 @@ describe('side hits', () => {
 });
 
 describe('site collisions in the simulation', () => {
-  const wall: Site = { obstacles: [{ id: 'wall', kind: 'building', minX: 16, maxX: 20, minZ: -8, maxZ: 8, height: 12 }] };
+  const wall: Site = { obstacles: [{ id: 'wall', kind: 'building', minX: 16, maxX: 20, minZ: -8, maxZ: 8, height: 12 }], zones: [] };
   const config = { ...OPEN_FIELD, site: wall };
 
   test('trolleying a low load into a building registers a bump and stops it', () => {
@@ -84,7 +84,7 @@ describe('site collisions in the simulation', () => {
   });
 
   test('a load can be landed on top of a building', () => {
-    const slab: Site = { obstacles: [{ ...wall.obstacles[0]!, minX: 8, maxX: 16 }] };
+    const slab: Site = { obstacles: [{ ...wall.obstacles[0]!, minX: 8, maxX: 16 }], zones: [] };
     const elevated = { ...OPEN_FIELD, site: slab };
     const start = createSimulation(elevated, { radius: 12, hookHeight: 20, slewAngle: 0, groundLoads: [] });
 

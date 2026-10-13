@@ -81,3 +81,27 @@ export function resolveSideHits(obstacles: readonly Obstacle[], body: LoadBody, 
     { body, speed: 0 },
   );
 }
+
+/** Entry and exit of a segment through one pair of parallel faces, as fractions of its length. */
+function slab(from: number, to: number, low: number, high: number): readonly [number, number] {
+  if (from === to) return from > low && from < high ? [0, 1] : [1, 0];
+  const first = (low - from) / (to - from);
+  const second = (high - from) / (to - from);
+  return [Math.min(first, second), Math.max(first, second)];
+}
+
+/** True when the straight rope from `top` to `bottom` passes through the block. */
+function crosses(obstacle: Obstacle, top: Vec3, bottom: Vec3): boolean {
+  const spans = [
+    slab(top.x, bottom.x, obstacle.minX, obstacle.maxX),
+    slab(top.z, bottom.z, obstacle.minZ, obstacle.maxZ),
+    slab(top.y, bottom.y, GROUND_HEIGHT, obstacle.height - STEP_TOLERANCE),
+  ];
+  const entry = Math.max(0, ...spans.map((span) => span[0]));
+  const exit = Math.min(1, ...spans.map((span) => span[1]));
+  return entry < exit;
+}
+
+/** The rope is fouled when the line from the trolley to the hook runs through a building. */
+export const isRopeFouled = (obstacles: readonly Obstacle[], trolley: Vec3, hook: Vec3): boolean =>
+  obstacles.some((obstacle) => crosses(obstacle, trolley, hook));
