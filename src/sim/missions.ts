@@ -33,8 +33,6 @@ export type Goal = PlaceGoal | ReachGoal;
 
 export interface Mission {
   readonly id: MissionId;
-  readonly title: string;
-  readonly briefing: string;
   readonly wind: WindConfig;
   readonly start: { readonly radius: number; readonly hookHeight: number; readonly slewAngle: number };
   readonly loads: readonly GroundLoad[];
@@ -72,8 +70,6 @@ const GUSTY: WindConfig = {
 export const MISSIONS: readonly Mission[] = [
   {
     id: 'free',
-    title: 'Treino livre',
-    briefing: 'Sem cronômetro. Todas as cargas no pátio e todos os instrumentos ligados.',
     wind: LIGHT_BREEZE,
     start: { radius: 14, hookHeight: 12, slewAngle: degToRad(-15) },
     loads: [
@@ -87,8 +83,6 @@ export const MISSIONS: readonly Mission[] = [
   },
   {
     id: 'basic',
-    title: 'Içamento básico',
-    briefing: 'Pegue 2 t de ferragem a 12 m de raio e pouse na laje a 30 m de altura.',
     wind: CALM,
     start: { radius: 9, hookHeight: 10, slewAngle: degToRad(-20) },
     loads: [{ payload: REBAR_BUNDLE, ...onGround(12, 0) }],
@@ -97,8 +91,6 @@ export const MISSIONS: readonly Mission[] = [
   },
   {
     id: 'limit',
-    title: 'Carga no limite',
-    briefing: 'Leve 3 t até o raio em que o momento chega a 95 % e segure 3 s, sem acionar o bloqueio do LMI.',
     wind: CALM,
     start: { radius: 9, hookHeight: 8, slewAngle: degToRad(10) },
     loads: [{ payload: CONCRETE_BLOCK, ...onGround(12, 0) }],
@@ -107,8 +99,6 @@ export const MISSIONS: readonly Mission[] = [
   },
   {
     id: 'wind',
-    title: 'Vento',
-    briefing: 'Posicione o painel de forma sobre o embasamento com rajadas de até 40 km/h. Sem cabo-guia (T) o painel gira com o vento.',
     wind: GUSTY,
     start: { radius: 16, hookHeight: 12, slewAngle: degToRad(-10) },
     loads: [{ payload: FORMWORK_PANEL, ...onGround(20, -12) }],
@@ -117,8 +107,6 @@ export const MISSIONS: readonly Mission[] = [
   },
   {
     id: 'precision',
-    title: 'Precisão',
-    briefing: 'Pouse o bloco dentro do alvo de 0,5 m de raio com balanço residual menor que 2°.',
     wind: CALM,
     start: { radius: 9, hookHeight: 8, slewAngle: degToRad(10) },
     loads: [{ payload: CONCRETE_BLOCK, ...onGround(12, 0) }],
@@ -127,8 +115,6 @@ export const MISSIONS: readonly Mission[] = [
   },
   {
     id: 'heavy',
-    title: 'Viga pesada',
-    briefing: 'Leve a viga de 5 t até o berço do outro lado da torre. Marcha lenta do guincho: cada tranco aparece no LMI.',
     wind: CALM,
     start: { radius: 6, hookHeight: 8, slewAngle: degToRad(20) },
     loads: [{ payload: PRECAST_BEAM, ...onGround(8, 7) }],

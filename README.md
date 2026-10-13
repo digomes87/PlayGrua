@@ -9,8 +9,8 @@ directions, realistic won, and the parameter is in [`src/craneSpec.ts`](src/cran
 
 Live at: <https://digomes87.github.io/PlayGrua/>
 
-The interface is in Brazilian Portuguese. The terms used on screen are given in parentheses below
-where they help.
+The interface is available in English (the default) and Brazilian Portuguese. The flags at the top
+of the menu switch between them, and the choice is remembered in the browser.
 
 ## Running locally
 
@@ -55,15 +55,15 @@ until the slack-rope switch stops the hoist).
 
 ## Missions
 
-1. **Free training** (Treino livre): no clock, four loads in the yard.
-2. **Basic lift** (Içamento básico): 2 t of rebar from 12 m radius onto the slab 30 m up.
-3. **Load at the limit** (Carga no limite): 3 t out to the radius where the moment reaches 95 %,
+1. **Free training**: no clock, four loads in the yard.
+2. **Basic lift**: 2 t of rebar from 12 m radius onto the slab 30 m up.
+3. **Load at the limit**: 3 t out to the radius where the moment reaches 95 %,
    held for 3 s, without tripping the cutoff.
-4. **Wind** (Vento): a 12 m² formwork panel in gusts up to 40 km/h.
-5. **Precision** (Precisão): a 0.5 m radius target with less than 2° of swing at touchdown.
-6. **Heavy beam** (Viga pesada): 5 t in the slow hoist gear to the cradle on the far side of the tower.
+4. **Wind**: a 12 m² formwork panel in gusts up to 40 km/h.
+5. **Precision**: a 0.5 m radius target with less than 2° of swing at touchdown.
+6. **Heavy beam**: 5 t in the slow hoist gear to the cradle on the far side of the tower.
 
-When a mission ends, **Rever a operação** replays it at 4×. The replay is not a video: the
+When a mission ends, **Review the operation** replays it at 4×. The replay is not a video: the
 simulation is deterministic, so it runs the mission again from the recorded commands and reaches the
 same state.
 
@@ -260,6 +260,7 @@ src/
   craneSpec.ts   every reference value of the crane
   physics/       pure, testable physics core
   sim/           simulation step, collisions, rigging, missions, scoring, replay
+  i18n/          interface languages and the text of each one
   render/        Three.js scene, procedural models, cameras
   input/         keyboard, gamepad, response curves
   ui/            instrument panel, menus, audio

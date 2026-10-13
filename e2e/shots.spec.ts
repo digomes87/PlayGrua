@@ -11,9 +11,9 @@ test('capture menu and the three cameras', async ({ page }) => {
     if (message.type() === 'error') errors.push(message.text());
   });
   await page.goto('./');
-  await expect(page.getByRole('button', { name: /Treino livre/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Free training/ })).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/menu.png` });
-  await page.getByRole('button', { name: /Treino livre/ }).click();
+  await page.getByRole('button', { name: /Free training/ }).click();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${SHOTS}/cab.png` });
   await page.keyboard.press('KeyC');

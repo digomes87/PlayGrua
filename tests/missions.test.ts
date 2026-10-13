@@ -123,7 +123,7 @@ describe('mission flow', () => {
 
     expect(session.toggleRigging()).toBe('released');
     expect(session.progress.outcome).toBe('running');
-    expect(session.progress.message).toContain('Fora do alvo');
+    expect(session.progress.message).toBe('offTarget');
     expect(session.toggleRigging()).toBe('rigged');
   });
 
@@ -176,7 +176,7 @@ describe('placing verdict', () => {
     const verdict = judgeRelease(swinging, precision, landedAt(-14, 14));
 
     expect(verdict.outcome).toBe('running');
-    expect(verdict.message).toContain('Balanço');
+    expect(verdict.message).toBe('swingTooHigh');
   });
 
   test('ignores a different payload', () => {
@@ -223,7 +223,7 @@ describe('telemetry', () => {
     const verdict = track(INITIAL_PROGRESS, basic, overloaded, quiet, SPEC, FIXED_STEP);
 
     expect(verdict.outcome).toBe('failed');
-    expect(verdict.message).toContain('110');
+    expect(verdict.message).toBe('overload');
   });
 
   test('stops counting once the mission is over', () => {
@@ -268,12 +268,6 @@ describe('scoring', () => {
   });
 
   test('breaks the score down into the five criteria', () => {
-    expect(scoreLines(clean, basic).map((line) => line.label)).toEqual([
-      'Tempo',
-      'Balanço máximo',
-      'Velocidade de pouso',
-      'Pico de momento',
-      'Colisões e cabo em estrutura',
-    ]);
+    expect(scoreLines(clean, basic).map((line) => line.criterion)).toEqual(['time', 'swing', 'landing', 'moment', 'collisions']);
   });
 });

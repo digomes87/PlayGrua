@@ -14,7 +14,7 @@ import { FIXED_STEP } from '../src/physics/units';
 import { SPEC } from './helpers';
 import { OPEN_FIELD, advance, liftedAt } from './simHelpers';
 
-const STREET: ForbiddenZone = { id: 'street', label: 'Rua', minX: -80, maxX: 80, minZ: 48, maxZ: 80 };
+const STREET: ForbiddenZone = { id: 'street', label: 'Street', minX: -80, maxX: 80, minZ: 48, maxZ: 80 };
 const at = (radius: number, angle: number) => {
   const crane = createCrane(SPEC, radius, 20);
   return { ...crane, slew: { ...crane.slew, angle } };
