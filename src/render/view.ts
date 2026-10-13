@@ -67,9 +67,12 @@ export class SceneView {
   render(session: Session): void {
     const pose = session.pose();
     const state = session.state;
-    const height = this.spec.geometry.trolleyHeight;
+    /** Jib and tower give under the load: the rope's upper end sits lower by tension over stiffness. */
+    const droop = state.tension / this.spec.cable.structureStiffness;
+    const height = this.spec.geometry.trolleyHeight - droop;
     const pivot = vec3(pose.radius * Math.cos(pose.slewAngle), height, pose.radius * Math.sin(pose.slewAngle));
     this.crane.slewing.rotation.y = -pose.slewAngle;
+    this.crane.slewing.rotation.z = -droop / pose.radius;
     this.crane.trolley.position.x = pose.radius;
     this.rig.update(
       {
@@ -77,8 +80,7 @@ export class SceneView {
         hook: pose.hook,
         ropeLength: state.crane.hoist.length,
         slewAngle: pose.slewAngle,
-        rigged: state.rigged,
-        isGrounded: state.body.grounded,
+        cargo: pose.cargo === null || state.cargo === null ? null : { ...pose.cargo, payload: state.cargo.payload },
       },
       state.groundLoads,
     );

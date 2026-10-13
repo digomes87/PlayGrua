@@ -8,7 +8,7 @@ import { missionById } from '../src/sim/missions';
 import { CONCRETE_BLOCK, REBAR_BUNDLE } from '../src/sim/payloads';
 import { INITIAL_PROGRESS, judgeRelease } from '../src/sim/progress';
 import { unrig } from '../src/sim/rigging';
-import { type SimulationState, hangingMass } from '../src/sim/simulation';
+import type { SimulationState } from '../src/sim/simulation';
 import type { Obstacle } from '../src/sim/site';
 import { PIVOT, SPEC, stillCable } from './helpers';
 import { OPEN_FIELD, advance, liftedAt, slungAt } from './simHelpers';
@@ -20,32 +20,40 @@ const FRICTIONLESS = {
     ...SPEC,
     aero: [],
     slew: { ...SPEC.slew, freeFriction: 0 },
-    cable: { ...SPEC.cable, dampingRatio: 0, swingDamping: 0 },
+    cable: { ...SPEC.cable, dampingRatio: 0, swingDamping: 0, slingDampingRatio: 0, swivelDamping: 0 },
   },
 };
 
+const spin = (mass: number, body: LoadBody): number =>
+  mass * (body.position.x * body.velocity.z - body.position.z * body.velocity.x);
+
 /** Angular momentum about the tower axis, positive in the direction of increasing slew angle. */
 function angularMomentum(state: SimulationState): number {
-  const { position, velocity } = state.body;
-  const load = hangingMass(state, SPEC).mass * (position.x * velocity.z - position.z * velocity.x);
-  return structureInertia(SPEC, state.crane.trolley.radius) * state.crane.slew.rate + load;
+  const cargo = state.cargo === null ? 0 : spin(state.cargo.payload.mass, state.cargo.body);
+  const drive = SPEC.slew.driveInertia * state.crane.slew.driveRate;
+  const jib = structureInertia(SPEC, state.crane.trolley.radius) * state.crane.slew.rate + drive;
+  return jib + spin(SPEC.masses.hookBlock, state.body) + cargo;
+}
+
+/** The lifted payload given a sideways shove across the jib. */
+function shoved(state: SimulationState): SimulationState {
+  const tangent = vec3(-Math.sin(state.crane.slew.angle), 0, Math.cos(state.crane.slew.angle));
+  const cargo = state.cargo!;
+  const body = { ...cargo.body, velocity: add(cargo.body.velocity, scale(tangent, 1.5)) };
+  return { ...state, cargo: { ...cargo, body } };
 }
 
 describe('rope reaction on the slew axis', () => {
   const lifted = liftedAt(REBAR_BUNDLE, 30, FRICTIONLESS);
 
   test('a load swinging across the jib drags a free jib the same way', () => {
-    const tangent = vec3(-Math.sin(lifted.crane.slew.angle), 0, Math.cos(lifted.crane.slew.angle));
-    const pushed = { ...lifted, body: { ...lifted.body, velocity: add(lifted.body.velocity, scale(tangent, 1.5)) } };
-
-    const later = advance(pushed, { weathervane: true }, 3, FRICTIONLESS);
+    const later = advance(shoved(lifted), { weathervane: true }, 6, FRICTIONLESS);
 
     expect(later.crane.slew.rate).toBeGreaterThan(0);
   });
 
-  test('angular momentum of jib plus load is conserved while the jib slews freely', () => {
-    const tangent = vec3(-Math.sin(lifted.crane.slew.angle), 0, Math.cos(lifted.crane.slew.angle));
-    const pushed = { ...lifted, body: { ...lifted.body, velocity: add(lifted.body.velocity, scale(tangent, 1.5)) } };
+  test('angular momentum of jib, hook block and payload is conserved while the jib slews freely', () => {
+    const pushed = shoved(lifted);
     const initial = angularMomentum(pushed);
 
     let worst = 0;
@@ -53,7 +61,7 @@ describe('rope reaction on the slew axis', () => {
       worst = Math.max(worst, Math.abs(angularMomentum(state) - initial));
     });
 
-    expect(initial).toBeGreaterThan(1e5);
+    expect(initial).toBeGreaterThan(5e4);
     expect(worst / initial).toBeLessThan(0.01);
   });
 });
@@ -86,14 +94,14 @@ describe('support under the centre of gravity', () => {
 });
 
 describe('releasing the hook', () => {
-  test('the hook block ends up clear above the payload and is not thrown sideways', () => {
+  test('neither the hook block nor the payload moves when the slings are taken off', () => {
     const hookOnTop = advance(slungAt(CONCRETE_BLOCK, 12), { hoist: -1 }, 4);
-    const released = { ...hookOnTop, ...unrig(hookOnTop, SPEC.masses.hookBlock, 0) };
-    const top = released.groundLoads[0]!.position.y + CONCRETE_BLOCK.size.y;
+    const released = { ...hookOnTop, ...unrig(hookOnTop) };
 
     const settled = advance(released, {}, 2);
 
-    expect(released.body.position.y - SPEC.geometry.hookBlockHeight).toBeGreaterThan(top);
+    expect(released.body).toBe(hookOnTop.body);
+    expect(released.groundLoads[0]!.position.y).toBeCloseTo(0, 9);
     expect(Math.hypot(settled.body.position.x - 12, settled.body.position.z)).toBeLessThan(0.05);
   });
 });

@@ -62,7 +62,7 @@ export interface LoadStep {
   readonly impactSpeed: number;
 }
 
-interface CablePull {
+export interface CablePull {
   readonly tension: number;
   /** Unit vector from the trolley to the load. */
   readonly direction: Vec3;
@@ -86,7 +86,7 @@ export const cableAfter = (motion: CableMotion, elapsed: number): CableMotion =>
   length: motion.length + motion.lengthRate * elapsed,
 });
 
-function pullOf(cable: CableProperties, mass: number, motion: CableMotion, position: Vec3, velocity: Vec3): CablePull {
+export function pullOf(cable: CableProperties, mass: number, motion: CableMotion, position: Vec3, velocity: Vec3): CablePull {
   const offset = subtract(position, motion.pivot);
   const distance = magnitude(offset);
   const stretch = distance - motion.length;
@@ -108,7 +108,7 @@ export const cableTension = (
   body: LoadBody,
 ): number => pullOf(cable, mass, motion, body.position, body.velocity).tension;
 
-function swingDamping(cable: CableProperties, pull: CablePull): Vec3 {
+export function swingDamping(cable: CableProperties, pull: CablePull): Vec3 {
   if (pull.tension === 0) return ZERO;
   return scale(reject(pull.relativeVelocity, pull.direction), -cable.swingDamping);
 }
@@ -159,7 +159,7 @@ function fly(
 }
 
 /** Puts the load on the supporting surface, keeping only its motion along it. */
-function seat(body: LoadBody, load: HangingMass, supportHeight: number): LoadBody {
+export function seat(body: LoadBody, load: HangingMass, supportHeight: number): LoadBody {
   const position = vec3(body.position.x, supportHeight + load.hangDepth, body.position.z);
   return { position, velocity: vec3(body.velocity.x, 0, body.velocity.z), grounded: true };
 }
@@ -171,13 +171,26 @@ function liftsOff(body: LoadBody, load: HangingMass, cable: CableProperties, mot
 }
 
 /** True while the surface is still under the load; false after it slid past an edge. */
-const isSupported = (body: LoadBody, load: HangingMass, supportHeight: number): boolean =>
+export const isSupported = (body: LoadBody, load: HangingMass, supportHeight: number): boolean =>
   body.position.y - load.hangDepth <= supportHeight + EDGE_TOLERANCE;
 
 /**
- * Load on a surface with Coulomb friction. A side pull below the static limit leaves it at rest;
- * above it the load is dragged, and friction brings it back to rest once the pull eases.
+ * Load on a surface with Coulomb friction under an `applied` force (everything but weight and
+ * ground reaction). A side pull below the static limit leaves it at rest; above it the load is
+ * dragged, and friction brings it back to rest once the pull eases.
  */
+export function slideUnder(body: LoadBody, mass: number, applied: Vec3, friction: Friction, step: number): LoadBody {
+  const normalForce = Math.max(0, mass * GRAVITY - applied.y);
+  const driving = vec3(applied.x, 0, applied.z);
+  const speed = magnitude(body.velocity);
+  if (speed === 0 && magnitude(driving) <= friction.static * normalForce) return body;
+  const heading = speed > 0 ? scale(body.velocity, 1 / speed) : normalize(driving);
+  const resistance = scale(heading, -friction.kinetic * normalForce);
+  const velocity = add(body.velocity, scale(add(driving, resistance), step / mass));
+  if (dot(velocity, heading) <= 0) return { ...body, velocity: ZERO };
+  return { ...body, position: add(body.position, scale(velocity, step)), velocity };
+}
+
 function slide(
   body: LoadBody,
   load: HangingMass,
@@ -189,15 +202,7 @@ function slide(
   const pull = pullOf(cable, load.mass, motion, body.position, body.velocity);
   const airForce = dragForce(subtract(surroundings.windVelocity, body.velocity), load.dragArea);
   const applied = add(scale(pull.direction, -pull.tension), airForce);
-  const normalForce = Math.max(0, load.mass * GRAVITY - applied.y);
-  const driving = vec3(applied.x, 0, applied.z);
-  const speed = magnitude(body.velocity);
-  if (speed === 0 && magnitude(driving) <= surroundings.friction.static * normalForce) return body;
-  const heading = speed > 0 ? scale(body.velocity, 1 / speed) : normalize(driving);
-  const friction = scale(heading, -surroundings.friction.kinetic * normalForce);
-  const velocity = add(body.velocity, scale(add(driving, friction), step / load.mass));
-  if (dot(velocity, heading) <= 0) return { ...body, velocity: ZERO };
-  return { ...body, position: add(body.position, scale(velocity, step)), velocity };
+  return slideUnder(body, load.mass, applied, surroundings.friction, step);
 }
 
 /**

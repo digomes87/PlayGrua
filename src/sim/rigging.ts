@@ -1,8 +1,9 @@
 /** Hooking loads on and off: the only way mass enters or leaves the rope. */
 import type { CraneSpec } from '../craneSpec';
 import type { LoadBody } from '../physics/pendulum';
+import type { Cargo, CargoProps } from '../physics/tandem';
 import { GRAVITY } from '../physics/units';
-import { type Vec3, ZERO, vec3 } from '../physics/vec3';
+import { type Vec3, ZERO, magnitude, subtract, vec3 } from '../physics/vec3';
 import { type Payload, footprintOf } from './payloads';
 import type { Obstacle } from './site';
 
@@ -13,49 +14,56 @@ export interface GroundLoad {
   readonly yaw: number;
 }
 
-export interface Rigged {
+/** A payload on the slings: its own body, heading and the sling length it was rigged with. */
+export interface Slung extends Cargo {
   readonly payload: Payload;
-  /** Hook point to payload underside: slings plus payload height. */
-  readonly slingDepth: number;
-}
-
-/**
- * Distance from the hook point down to the combined centre of gravity of hook block and payload.
- * Hook, slings and payload are taken as one rigid link in line with the rope, so this is what
- * lengthens the pendulum beyond the rope itself.
- */
-export function centreOffset(rigged: Rigged | null, hookMass: number): number {
-  if (rigged === null) return 0;
-  const payloadCentre = rigged.slingDepth - rigged.payload.size.y / 2;
-  return (rigged.payload.mass * payloadCentre) / (rigged.payload.mass + hookMass);
+  /** Hook point to payload centre of gravity with the slings taut. */
+  readonly slingLength: number;
 }
 
 export interface RiggingState {
+  /** The hook block. */
   readonly body: LoadBody;
-  readonly rigged: Rigged | null;
+  readonly cargo: Slung | null;
   readonly groundLoads: readonly GroundLoad[];
 }
 
 const REACH_RADIUS = 1.2;
 const MAX_SLING = 3;
+const HOOK_OVERLAP = 0.1;
 /** Clearance kept between the hook block and the top of the payload it is slung to. */
 const SLING_CLEARANCE = 0.1;
-const HOOK_OVERLAP = 0.1;
 /** The rope must carry no more than this multiple of the hook block weight to unhook. */
 const UNHOOK_TENSION_FACTOR = 1.5;
 
-export const asObstacle = (load: GroundLoad, index: number): Obstacle => {
-  const halfWidth = footprintOf(load.payload);
+const boxAround = (id: string, centre: Vec3, payload: Payload): Obstacle => {
+  const halfWidth = footprintOf(payload);
   return {
-    id: `load-${index}`,
+    id,
     kind: 'stack',
-    minX: load.position.x - halfWidth,
-    maxX: load.position.x + halfWidth,
-    minZ: load.position.z - halfWidth,
-    maxZ: load.position.z + halfWidth,
-    height: load.position.y + load.payload.size.y,
+    minX: centre.x - halfWidth,
+    maxX: centre.x + halfWidth,
+    minZ: centre.z - halfWidth,
+    maxZ: centre.z + halfWidth,
+    height: centre.y + payload.size.y / 2,
   };
 };
+
+const centreOf = (load: GroundLoad): Vec3 =>
+  vec3(load.position.x, load.position.y + load.payload.size.y / 2, load.position.z);
+
+export const asObstacle = (load: GroundLoad, index: number): Obstacle =>
+  boxAround(`load-${index}`, centreOf(load), load.payload);
+
+/** A slung payload standing on something is a surface the slack hook block can come to rest on. */
+export const cargoObstacle = (cargo: Slung): Obstacle => boxAround('cargo', cargo.body.position, cargo.payload);
+
+export const cargoProps = (cargo: Slung): CargoProps => ({
+  mass: cargo.payload.mass,
+  size: cargo.payload.size,
+  dragCoefficient: cargo.payload.dragCoefficient,
+  slingLength: cargo.slingLength,
+});
 
 function isWithinReach(hook: Vec3, load: GroundLoad): boolean {
   const clearance = hook.y - (load.position.y + load.payload.size.y);
@@ -64,39 +72,47 @@ function isWithinReach(hook: Vec3, load: GroundLoad): boolean {
 }
 
 export const reachableLoad = (state: RiggingState): GroundLoad | undefined => {
-  if (state.rigged !== null) return undefined;
+  if (state.cargo !== null) return undefined;
   return state.groundLoads.find((load) => isWithinReach(state.body.position, load));
 };
 
-/** Slings the reachable load: the hook snaps over its centre and the load starts on the ground. */
+/**
+ * Slings the reachable load. Nothing moves: the slings are cut to the distance between the hook
+ * and the payload as they stand, so an off-centre pick starts with a slanted sling and swings.
+ */
 export function rig(state: RiggingState, spec: CraneSpec): RiggingState {
   const load = reachableLoad(state);
   if (load === undefined) return state;
-  const shortest = load.payload.size.y + spec.geometry.hookBlockHeight + SLING_CLEARANCE;
-  const slingDepth = Math.max(state.body.position.y - load.position.y, shortest);
-  const rigged = { payload: load.payload, slingDepth };
-  const centreHeight = load.position.y + slingDepth - centreOffset(rigged, spec.masses.hookBlock);
+  const centre = centreOf(load);
+  const shortest = load.payload.size.y / 2 + spec.geometry.hookBlockHeight + SLING_CLEARANCE;
+  const slingLength = Math.max(magnitude(subtract(state.body.position, centre)), shortest);
   return {
-    body: { position: vec3(load.position.x, centreHeight, load.position.z), velocity: ZERO, grounded: true },
-    rigged,
+    body: state.body,
+    cargo: {
+      payload: load.payload,
+      slingLength,
+      body: { position: centre, velocity: ZERO, grounded: true },
+      yaw: load.yaw,
+      yawRate: 0,
+    },
     groundLoads: state.groundLoads.filter((candidate) => candidate !== load),
   };
 }
 
 export const canUnrig = (state: RiggingState, tension: number, spec: CraneSpec): boolean =>
-  state.rigged !== null &&
-  state.body.grounded &&
+  state.cargo !== null &&
+  state.cargo.body.grounded &&
   tension <= UNHOOK_TENSION_FACTOR * spec.masses.hookBlock * GRAVITY;
 
-/** Leaves the load where it stands; the hook block is free again, at the top of the slack slings. */
-export function unrig(state: RiggingState, hookMass: number, yaw: number): RiggingState {
-  if (state.rigged === null) return state;
-  const offset = centreOffset(state.rigged, hookMass);
-  const { x, y, z } = state.body.position;
-  const underside = vec3(x, y + offset - state.rigged.slingDepth, z);
+/** Leaves the payload where it stands; the hook block stays where it is. */
+export function unrig(state: RiggingState): RiggingState {
+  const cargo = state.cargo;
+  if (cargo === null) return state;
+  const { x, y, z } = cargo.body.position;
+  const underside = vec3(x, y - cargo.payload.size.y / 2, z);
   return {
-    body: { position: vec3(x, y + offset, z), velocity: ZERO, grounded: false },
-    rigged: null,
-    groundLoads: [...state.groundLoads, { payload: state.rigged.payload, position: underside, yaw }],
+    body: state.body,
+    cargo: null,
+    groundLoads: [...state.groundLoads, { payload: cargo.payload, position: underside, yaw: cargo.yaw }],
   };
 }

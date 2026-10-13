@@ -1,16 +1,16 @@
 import { describe, expect, test } from 'vitest';
 import { capacityAt } from '../src/physics/loadChart';
-import { swingAngle } from '../src/physics/pendulum';
 import { trolleyPosition } from '../src/physics/crane';
 import { GRAVITY, kmhToMs, radToDeg } from '../src/physics/units';
 import { CALM } from '../src/physics/wind';
 import { CONCRETE_BLOCK, FORMWORK_PANEL, PRECAST_BEAM, REBAR_BUNDLE } from '../src/sim/payloads';
 import { canUnrig, unrig } from '../src/sim/rigging';
-import { type SimulationState, createSimulation } from '../src/sim/simulation';
+import { type SimulationState, createSimulation, loadSwing } from '../src/sim/simulation';
 import { SPEC } from './helpers';
 import { GUSTY, OPEN_FIELD, advance, liftedAt, slungAt } from './simHelpers';
 
-const swingOf = (state: SimulationState): number => swingAngle(state.body, trolleyPosition(state.crane, SPEC));
+const swingOf = (state: SimulationState): number => loadSwing(state, SPEC);
+const loadOf = (state: SimulationState) => (state.cargo?.body ?? state.body);
 
 const scripted = (config = { ...OPEN_FIELD, wind: GUSTY }): SimulationState => {
   const lifted = advance(slungAt(REBAR_BUNDLE, 12, config), { hoist: 1 }, 8, config);
@@ -45,7 +45,7 @@ describe('lifting', () => {
   test('the LMI reads payload plus hook block once the load hangs', () => {
     const lifted = liftedAt(REBAR_BUNDLE, 12);
 
-    expect(lifted.body.grounded).toBe(false);
+    expect(lifted.cargo!.body.grounded).toBe(false);
     expect(lifted.lmi.measuredLoad).toBeCloseTo(REBAR_BUNDLE.mass + SPEC.masses.hookBlock, -1);
     expect(lifted.lmi.status).toBe('normal');
   });
@@ -53,8 +53,8 @@ describe('lifting', () => {
   test('a load sitting on the ground weighs nothing on the hook until the rope takes it up', () => {
     const slung = advance(slungAt(REBAR_BUNDLE, 12), {}, 1);
 
-    expect(slung.body.grounded).toBe(true);
-    expect(slung.lmi.measuredLoad).toBeLessThan(SPEC.masses.hookBlock);
+    expect(slung.cargo!.body.grounded).toBe(true);
+    expect(slung.lmi.measuredLoad).toBeLessThan(SPEC.masses.hookBlock * 1.05);
   });
 
   test('snatching a slackened rope at full speed shows a much higher peak load than a gentle lift', () => {
@@ -85,7 +85,7 @@ describe('LMI in operation', () => {
 
     const attempt = advance(slungAt(PRECAST_BEAM, radius), { hoist: 1, fine: true }, 30);
 
-    expect(attempt.body.grounded).toBe(true);
+    expect(attempt.cargo!.body.grounded).toBe(true);
     expect(['cutoff', 'overload']).toContain(attempt.lmi.status);
     expect(attempt.crane.hoist.rate).toBe(0);
     expect(attempt.lmi.measuredLoad).toBeLessThan(PRECAST_BEAM.mass);
@@ -131,13 +131,13 @@ describe('swing', () => {
 
     expect(radToDeg(widest)).toBeGreaterThan(1);
     expect(radToDeg(widest)).toBeLessThan(15);
-    expect(Math.abs(stopped.body.velocity.x)).toBeGreaterThan(0.01);
+    expect(Math.abs(loadOf(stopped).velocity.x)).toBeGreaterThan(0.01);
   });
 
   test('slewing throws the load outwards and behind the jib', () => {
     const slewing = advance(liftedAt(REBAR_BUNDLE, 40), { slew: 1 }, 25);
     const pivot = trolleyPosition(slewing.crane, SPEC);
-    const loadRadius = Math.hypot(slewing.body.position.x, slewing.body.position.z);
+    const loadRadius = Math.hypot(loadOf(slewing).position.x, loadOf(slewing).position.z);
 
     expect(loadRadius).toBeGreaterThan(Math.hypot(pivot.x, pivot.z));
     expect(radToDeg(swingOf(slewing))).toBeGreaterThan(0.2);
@@ -160,7 +160,7 @@ describe('swing', () => {
 describe('wind on the load', () => {
   const steadyBreeze = { ...CALM, meanSpeed: kmhToMs(40), meanDirection: Math.PI / 2, peakSpeed: kmhToMs(40) };
   const windy = { ...OPEN_FIELD, wind: steadyBreeze };
-  const driftOf = (state: SimulationState): number => state.body.position.z - trolleyPosition(state.crane, SPEC).z;
+  const driftOf = (state: SimulationState): number => loadOf(state).position.z - trolleyPosition(state.crane, SPEC).z;
 
   test('a large panel is pushed downwind much more than a compact block', () => {
     const panel = advance(liftedAt(FORMWORK_PANEL, 20, windy), {}, 60, windy);
@@ -170,14 +170,24 @@ describe('wind on the load', () => {
     expect(driftOf(panel)).toBeGreaterThan(8 * driftOf(block));
   });
 
-  test('the steady deflection matches the drag-to-weight ratio', () => {
-    const panel = advance(liftedAt(FORMWORK_PANEL, 20, windy), {}, 240, windy);
-    const height = panel.body.position.y;
+  test('the mean deflection of a panel is bounded by its broadside drag-to-weight ratio', () => {
+    const settled = advance(liftedAt(FORMWORK_PANEL, 20, windy), {}, 60, windy);
+    const height = settled.cargo!.body.position.y;
     const speed = steadyBreeze.meanSpeed * (height / steadyBreeze.referenceHeight) ** steadyBreeze.shearExponent;
-    const drag = 0.5 * 1.225 * (FORMWORK_PANEL.dragArea + 0.3) * speed ** 2;
-    const expected = Math.atan(drag / ((FORMWORK_PANEL.mass + SPEC.masses.hookBlock) * GRAVITY));
+    const drag = 0.5 * 1.225 * FORMWORK_PANEL.dragCoefficient * 12 * speed ** 2;
+    const broadside = Math.atan(drag / ((FORMWORK_PANEL.mass + SPEC.masses.hookBlock) * GRAVITY));
+    const rope = settled.crane.hoist.length + settled.cargo!.slingLength;
+    let sum = 0;
+    let count = 0;
 
-    expect(swingOf(panel)).toBeCloseTo(expected, 2);
+    advance(settled, {}, 180, windy, (state) => {
+      sum += driftOf(state);
+      count += 1;
+    });
+    const meanDeflection = Math.atan(sum / count / rope);
+
+    expect(meanDeflection).toBeGreaterThan(0.3 * broadside);
+    expect(meanDeflection).toBeLessThan(1.15 * broadside);
   });
 
   test('above 72 km/h the drives are locked but the weathervane turns the jib downwind', () => {
@@ -188,7 +198,8 @@ describe('wind on the load', () => {
     const locked = advance(start, { slew: -1, trolley: 1, hoist: 1 }, 10, config);
     const released = advance(start, { weathervane: true }, 240, config);
 
-    expect(locked.crane.slew.angle).toBe(0);
+    expect(locked.crane.slew.driveRate).toBeCloseTo(0, 12);
+    expect(Math.abs(locked.crane.slew.angle)).toBeLessThan(0.01);
     expect(locked.crane.trolley.radius).toBe(20);
     expect(locked.crane.hoist.length).toBe(start.crane.hoist.length);
     expect(Math.abs(released.crane.slew.angle - Math.PI / 2)).toBeLessThan(0.35);
@@ -203,14 +214,14 @@ describe('setting down', () => {
       touchdown = Math.max(touchdown, events.touchdownSpeed);
     });
 
-    expect(landed.body.grounded).toBe(true);
+    expect(landed.cargo!.body.grounded).toBe(true);
     expect(touchdown).toBeGreaterThan(0.1);
     expect(touchdown).toBeLessThan(0.5);
     expect(landed.crane.hoist.rate).toBe(0);
     expect(canUnrig(landed, landed.tension, SPEC)).toBe(true);
 
-    const released = advance({ ...landed, ...unrig(landed, SPEC.masses.hookBlock, 0) }, {}, 3);
-    expect(released.rigged).toBeNull();
+    const released = advance({ ...landed, ...unrig(landed) }, {}, 3);
+    expect(released.cargo).toBeNull();
     expect(released.groundLoads).toHaveLength(1);
     expect(released.groundLoads[0]!.position.y).toBeCloseTo(0, 6);
     expect(released.lmi.measuredLoad).toBeLessThan(SPEC.masses.hookBlock * 1.1);

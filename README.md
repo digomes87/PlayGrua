@@ -15,7 +15,7 @@ Requer Node 22 ou mais novo.
 npm install
 npm run dev        # servidor de desenvolvimento
 npm test           # testes da física e da simulação (Vitest)
-npm run test:e2e   # testes no navegador (Playwright, usa o Chrome instalado)
+npm run test:e2e   # testes no navegador: Chrome, Firefox e WebKit (npx playwright install firefox webkit)
 npm run build      # gera dist/
 npm run preview    # serve o build em /PlayGrua/
 ```
@@ -42,7 +42,8 @@ cata-vento. Curva expo e zona morta são ajustáveis no menu. Teclado e gamepad 
 O joystick comanda **velocidade alvo**, nunca posição. Soltar o comando não para a grua: cada eixo
 desacelera na sua rampa e a carga continua balançando.
 
-Para engatar, leve o gancho até 1,2 m do centro da carga e a no máximo 3 m acima dela. Para soltar,
+Para engatar, leve o gancho até 1,2 m do centro da carga e a no máximo 3 m acima dela; fora de centro
+a carga sai balançando. Para soltar,
 a carga precisa estar apoiada e o cabo aliviado (desça até a chave de cabo frouxo parar o guincho).
 
 ## Missões
@@ -63,27 +64,37 @@ Tudo em SI, em `src/physics`, sem dependência do Three.js. Passo fixo de 120 Hz
 framerate (acumulador), com o estado interpolado para a renderização. A simulação é determinística:
 mesma entrada e mesma semente de vento geram o mesmo estado, bit a bit.
 
-### Carga: pêndulo esférico
+### Carga: pêndulo duplo
 
-A carga é uma massa pontual no centro de gravidade do conjunto moitão + carga, ligada ao carrinho por
-um cabo que é uma **mola-amortecedor que só traciona**. As equações são as de Newton no referencial
-inercial, em coordenadas cartesianas, integradas por RK4:
+Moitão e carga são duas massas. O cabo liga o carrinho ao moitão e as lingas ligam o moitão à carga;
+os dois são **mola-amortecedor que só traciona**. As equações são as de Newton no referencial
+inercial, em coordenadas cartesianas, integradas juntas por RK4:
 
 ```
-m·a = m·g − T·d̂ + ½·ρ·Cd·A·|v_ar − v|·(v_ar − v) − c·v⊥
-T   = max(0, k·(|d| − L) + c_axial·d(|d| − L)/dt)
-k   = 1 / (1/(E·A/(L + L_fixo)) + 1/k_estrutura)
+m₁·a₁ = m₁·g − T·d̂₁ + S·d̂₂ + arrasto do moitão − c·v⊥
+m₂·a₂ = m₂·g − S·d̂₂ + F_aero(ψ)
+I_z·ψ̈ = M_aero(ψ) + M_cabo − c_destorcedor·ψ̇
+T     = max(0, k·(|d₁| − L) + c_axial·d(|d₁| − L)/dt)
+k     = 1 / (1/(E·A/(L + L_fixo)) + 1/k_estrutura)
 ```
 
-onde `d` vai do carrinho à carga e `L(t)` é o comprimento de cabo desenrolado. Como o ponto de
-suspensão se move de verdade (translação do carrinho e rotação da lança), as acelerações centrípeta e
-tangencial, e o termo de Coriolis da variação de `L`, aparecem sozinhos, sem hipótese de pequenos
-ângulos. Consequências que saem do modelo, sem regra especial:
+onde `d₁` vai do carrinho ao moitão, `d₂` do moitão à carga, `L(t)` é o cabo desenrolado e `ψ` é a
+orientação da carga em torno da vertical. Como o ponto de suspensão se move de verdade (translação do
+carrinho e rotação da lança), as acelerações centrípeta e tangencial e o termo de Coriolis da variação
+de `L` aparecem sozinhos, sem hipótese de pequenos ângulos. Consequências que saem do modelo:
 
-- cabo frouxo não empurra: com `T = 0` a carga cai livre ou fica apoiada;
+- cabo ou linga frouxos não empurram: a carga cai livre ou fica apoiada;
 - içar com tranco gera pico de tensão, e o LMI mostra esse pico;
 - encurtar o cabo de uma carga balançando aumenta o ângulo de balanço;
-- o período de pequenas oscilações é `2π√(L/g)` (erro medido de 0,01 %).
+- o cabo e as lingas fazem ângulo entre si: carga leve em linga longa balança no modo lento do
+  pêndulo duplo, mais devagar que `2π√(L/g)` (frequência medida a menos de 1 % da analítica);
+- engatar fora de centro deixa a linga inclinada e a carga sai balançando.
+
+**Vento na carga.** Cada par de faces verticais é uma placa plana: força normal pela lei de
+Rayleigh-Kirchhoff, escalada para dar o `Cd` da carga de frente para o vento, aplicada num centro de
+pressão que anda para o bordo de ataque em baixa incidência. Por isso o arrasto depende da orientação
+(um painel de lado pega uma fração do vento) e o vento gira o painel até ficar atravessado. A carga
+não acompanha o giro da lança: só o torque fraco das duas quedas de cabo a realinha.
 
 No chão a carga tem atrito de Coulomb (μ estático 0,5, cinético 0,4): tração lateral pequena não a
 move, acima do limite ela é arrastada, e ela só sai do chão quando a componente vertical da tração
@@ -91,16 +102,23 @@ passa do peso. Uma carga que pousa com velocidade lateral derrapa até o atrito 
 
 ### Atuadores
 
-- **Giro**: acionado por torque. `I(r)·ω̇ = τ_motor + τ_vento + τ_cabo − 2·m_carrinho·r·ṙ·ω`. A inércia
+Os três eixos usam o mesmo modelo de acionamento: o joystick move uma referência de velocidade em
+rampa, o motor a segue enquanto tiver força, e com o comando solto e a referência em zero o freio
+fecha, com capacidade limitada.
+
+- **Giro**: duas inércias ligadas pela torção de torre e lança. Motor e freio agem no acionamento;
+  vento e cabo agem na lança: `I(r)·ω̇ = τ_torção + τ_vento + τ_cabo − 2·m_carrinho·r·ṙ·ω`. A inércia
   `I` é calculada das massas de lança, contra-lança, contrapeso e carrinho; a carga entra pela força
   real do cabo no carrinho, então uma carga pesada na ponta atrasa a aceleração e uma carga balançando
-  puxa a lança. O motor é uma malha de velocidade saturada em 220 kN·m. Com o comando solto a
-  referência desce na rampa de frenagem e só então o freio de estacionamento fecha, com torque limitado
-  (vento forte o faz escorregar).
-- **Carrinho** e **guincho**: inversores com rampas de aceleração e desaceleração e redução de
-  velocidade antes dos fins de curso. O guincho cai de 1,2 para 0,6 m/s acima de 4 t e tem chave de
-  cabo frouxo.
-- **Emergência**: guincho e carrinho param nas rampas de emergência e o giro freia no torque máximo.
+  puxa a lança. A lança atrasa na partida e fica vibrando depois que o freio fecha, com
+  `T = 2π√(I/K)` (cerca de 2,5 s) e 5 % de amortecimento. O motor satura em 220 kN·m e o freio em
+  300 kN·m, e vento forte o faz escorregar.
+- **Carrinho**: a componente do cabo ao longo da lança e a força centrífuga agem no carrinho. O
+  motor dá até 9 kN e o freio segura 14 kN; uma carga pesada balançando forte arrasta o carrinho.
+- **Guincho**: a tensão do cabo age no tambor. As marchas são limites de força (55 kN a 1,2 m/s,
+  106 kN a 0,6 m/s, a mesma potência), então um pico acima disso faz o guincho ceder em vez de subir.
+  Tem redução de velocidade antes dos fins de curso e chave de cabo frouxo.
+- **Emergência**: os três freios fecham na capacidade máxima.
 
 ### Tabela de carga e LMI
 
@@ -133,30 +151,33 @@ esteja sobre ele: com o centro para fora da borda a carga não fica apoiada e ca
 
 ## Testes
 
-`npm test` roda 196 testes, entre eles os obrigatórios:
+`npm test` roda 233 testes, entre eles os obrigatórios:
 
 - período do pêndulo contra `2π√(L/g)` para cabos de 5, 20 e 40 m, erro abaixo de 1 %;
+- frequência do modo lento do pêndulo duplo contra a solução analítica, erro abaixo de 1 %;
 - conservação de energia sem amortecimento nem atuação: deriva abaixo de 0,5 % em 60 s;
 - tabela de carga nos pontos tabelados e interpolação monotônica;
 - bloqueio do LMI a 100 %, isolado e com a grua em operação;
 - determinismo: duas execuções com a mesma entrada e semente dão estado idêntico.
 
-Há também testes de conservação do momento angular do conjunto lança + carga com o giro livre
-(deriva abaixo de 1 % em 30 s), atrito de solo, cabo frouxo, pico de carga no tranco, vento na carga, cata-vento,
+Há também testes de conservação do momento angular de lança, moitão e carga com o giro livre
+(deriva abaixo de 1 % em 30 s), das três missões de pouso jogadas do início ao fim por um piloto
+automático, da vibração de torção da lança, dos limites de força dos acionamentos, atrito de solo, cabo frouxo, pico de carga no tranco, vento na carga, cata-vento,
 colisões, missões, pontuação e persistência.
 
 ## Limitações conhecidas
 
-- Moitão, lingas e carga formam um elo rígido alinhado ao cabo: não há pêndulo duplo nem rotação da
-  carga em torno do cabo. A área de arrasto de cada carga é constante, independente da orientação.
-- A flexibilidade da lança e da torre entra só como rigidez vertical em série com o cabo. A lança não
-  flete visualmente nem torce no giro.
-- Carrinho e guincho seguem a rampa do inversor: a carga não os arrasta de volta.
-- Colisões simplificadas: a carga é um prisma de base quadrada (média das duas dimensões), sem
-  tombamento. O cabo e a lança não colidem com os prédios.
+- A aerodinâmica da carga é quase-estática. Num painel grande ela prevê oscilação acoplada de
+  orientação e balanço que cresce quando as duas frequências coincidem (perto de 8 m/s para o painel
+  de 12 m² em 24 m de cabo). O mecanismo é real, mas a amplitude não foi validada contra medição.
+- A carga gira só em torno da vertical: não tomba nem inclina além do ângulo das lingas. Não há
+  cabo-guia.
+- A flexibilidade da estrutura são duas molas: torção entre o acionamento de giro e a lança, e
+  rigidez vertical em série com o cabo. A lança não tem modos de flexão próprios.
+- Colisões simplificadas: a carga é um prisma de base quadrada (média das duas dimensões, qualquer
+  que seja a orientação). O cabo e a lança não colidem com os prédios.
 - Cargas apoiadas não são levadas pelo vento.
-- Sem modo fora de serviço completo, sem múltiplas quedas de cabo configuráveis e sem falhas de
-  equipamento.
+- Sem modo fora de serviço completo e sem falhas de equipamento.
 
 ## Estrutura
 

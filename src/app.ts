@@ -54,6 +54,7 @@ export class App {
   private latches = RELEASED;
   private lastFrame = 0;
   private isReported = false;
+  private isBackdropDrawn = false;
 
   constructor() {
     const canvas = requireElement('scene', HTMLCanvasElement);
@@ -67,7 +68,10 @@ export class App {
       onSettings: (settings) => this.applySettings(settings),
     });
     this.session = this.load('free');
-    window.addEventListener('resize', () => this.view.resize());
+    window.addEventListener('resize', () => {
+      this.view.resize();
+      this.isBackdropDrawn = false;
+    });
     window.addEventListener('pointerdown', () => this.audio.unlock());
     window.addEventListener('keydown', () => this.audio.unlock());
     this.openMenu(false);
@@ -83,9 +87,16 @@ export class App {
     const input = mergeInputs(this.keyboard.read(), this.gamepad.read(this.settings));
     input.actions.forEach((action) => this.perform(action));
     if (!this.menu.isOpen) this.simulate(elapsed, input);
-    this.view.render(this.session);
+    this.draw();
     this.refresh(input);
     requestAnimationFrame((next) => this.frame(next));
+  }
+
+  /** Behind the menu the scene is a still backdrop: it is drawn once, not sixty times a second. */
+  private draw(): void {
+    if (this.menu.isOpen && this.isBackdropDrawn) return;
+    this.isBackdropDrawn = this.menu.isOpen;
+    this.view.render(this.session);
   }
 
   private simulate(elapsed: number, input: DeviceInput): void {
@@ -139,6 +150,7 @@ export class App {
     this.hud.showMission(session.mission);
     this.latches = RELEASED;
     this.isReported = false;
+    this.isBackdropDrawn = false;
     return session;
   }
 

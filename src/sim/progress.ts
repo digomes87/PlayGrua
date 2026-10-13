@@ -1,10 +1,8 @@
 /** Folds simulation steps into mission telemetry and decides success or failure. */
 import type { CraneSpec } from '../craneSpec';
-import { trolleyPosition } from '../physics/crane';
-import { swingAngle } from '../physics/pendulum';
 import type { Goal, Mission, PlaceGoal, ReachGoal } from './missions';
 import type { GroundLoad } from './rigging';
-import type { SimulationState, StepEvents } from './simulation';
+import { type SimulationState, type StepEvents, isCarrying, loadSwing } from './simulation';
 
 export type Outcome = 'running' | 'success' | 'failed';
 
@@ -49,10 +47,7 @@ export const INITIAL_PROGRESS: Progress = {
   message: '',
 };
 
-const swingOf = (state: SimulationState, spec: CraneSpec): number =>
-  swingAngle(state.body, trolleyPosition(state.crane, spec));
-
-const isCarrying = (state: SimulationState): boolean => state.rigged !== null && !state.body.grounded;
+const swingOf = loadSwing;
 
 function trackSwing(progress: Progress, state: SimulationState, spec: CraneSpec): Progress {
   if (!isCarrying(state)) return progress;
@@ -60,7 +55,7 @@ function trackSwing(progress: Progress, state: SimulationState, spec: CraneSpec)
 }
 
 function trackLanding(progress: Progress, state: SimulationState, events: StepEvents, spec: CraneSpec): Progress {
-  if (events.touchdownSpeed <= 0 || state.rigged === null) return progress;
+  if (events.touchdownSpeed <= 0 || state.cargo === null) return progress;
   const isHard = events.touchdownSpeed > HARD_LANDING_SPEED;
   return {
     ...progress,
@@ -92,7 +87,7 @@ const isStill = (state: SimulationState): boolean =>
   Math.abs(state.crane.trolley.speed) < STILL_SPEED && Math.abs(state.crane.hoist.rate) < STILL_SPEED;
 
 function isHolding(goal: ReachGoal, state: SimulationState): boolean {
-  if (state.rigged?.payload.id !== goal.payloadId) return false;
+  if (state.cargo?.payload.id !== goal.payloadId) return false;
   const isOnTarget = Math.abs(state.lmi.utilization - goal.utilization) <= goal.tolerance;
   return isCarrying(state) && isOnTarget && isStill(state);
 }

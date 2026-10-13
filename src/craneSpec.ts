@@ -15,6 +15,11 @@ export interface AeroSegment {
   readonly arm: number;
 }
 
+export interface HoistGear {
+  readonly force: number;
+  readonly reflectedMass: number;
+}
+
 export interface CraneSpec {
   readonly geometry: {
     readonly trolleyHeight: number;
@@ -41,12 +46,22 @@ export interface CraneSpec {
     readonly brakeTorque: number;
     readonly controlBandwidth: number;
     readonly freeFriction: number;
+    /** Motor and gear inertia reflected to the slew axis, kg·m². */
+    readonly driveInertia: number;
+    /** Torsional stiffness of tower and jib between the drive and the jib, N·m/rad. */
+    readonly torsionalStiffness: number;
+    readonly torsionalDampingRatio: number;
   };
   readonly trolley: {
     readonly maxSpeed: number;
     readonly acceleration: number;
     readonly deceleration: number;
-    readonly emergencyDeceleration: number;
+    /** Largest force the trolley drive puts on the trolley, N. */
+    readonly driveForce: number;
+    readonly brakeForce: number;
+    /** Trolley mass plus the drive train reflected to it, kg. */
+    readonly effectiveMass: number;
+    readonly controlBandwidth: number;
   };
   readonly hoist: {
     readonly lightSpeed: number;
@@ -54,7 +69,11 @@ export interface CraneSpec {
     readonly heavyLoadThreshold: number;
     readonly acceleration: number;
     readonly deceleration: number;
-    readonly emergencyDeceleration: number;
+    /** Rope force the motor can hold and the drive train inertia seen at the hook, per gear. */
+    readonly lightGear: HoistGear;
+    readonly heavyGear: HoistGear;
+    readonly brakeForce: number;
+    readonly controlBandwidth: number;
     readonly maxCableLength: number;
     /** Fraction of the hook block weight below which the slack-rope switch stops lowering. */
     readonly slackTensionFraction: number;
@@ -69,6 +88,13 @@ export interface CraneSpec {
     readonly dampingRatio: number;
     /** Light swing damping (rope hysteresis), 1/s. */
     readonly swingDamping: number;
+    /** Axial stiffness of the slings between hook and payload, N/m. */
+    readonly slingStiffness: number;
+    readonly slingDampingRatio: number;
+    /** Distance between the two rope falls, which gives the hook block a weak heading. */
+    readonly fallSpacing: number;
+    /** Friction of the hook swivel, N·m·s/rad. */
+    readonly swivelDamping: number;
   };
   readonly loadChart: readonly ChartPoint[];
   readonly lmi: {
@@ -135,12 +161,18 @@ export const DEFAULT_CRANE_SPEC: CraneSpec = {
     brakeTorque: 3.0e5,
     controlBandwidth: 2,
     freeFriction: 5.0e4,
+    driveInertia: 2.0e6,
+    torsionalStiffness: 8.8e7,
+    torsionalDampingRatio: 0.05,
   },
   trolley: {
     maxSpeed: 1.0,
     acceleration: 0.4,
     deceleration: 0.5,
-    emergencyDeceleration: 1.0,
+    driveForce: 9000,
+    brakeForce: 14000,
+    effectiveMass: 1950,
+    controlBandwidth: 20,
   },
   hoist: {
     lightSpeed: 1.2,
@@ -148,7 +180,10 @@ export const DEFAULT_CRANE_SPEC: CraneSpec = {
     heavyLoadThreshold: tonnesToKg(4),
     acceleration: 0.5,
     deceleration: 0.6,
-    emergencyDeceleration: 1.5,
+    lightGear: { force: 55000, reflectedMass: 8000 },
+    heavyGear: { force: 106000, reflectedMass: 32000 },
+    brakeForce: 130000,
+    controlBandwidth: 20,
     maxCableLength: 49,
     slackTensionFraction: 0.5,
   },
@@ -158,6 +193,10 @@ export const DEFAULT_CRANE_SPEC: CraneSpec = {
     structureStiffness: 2.5e5,
     dampingRatio: 0.08,
     swingDamping: 0.004,
+    slingStiffness: 2.0e6,
+    slingDampingRatio: 0.2,
+    fallSpacing: 0.28,
+    swivelDamping: 15,
   },
   loadChart: LOAD_CHART,
   lmi: {

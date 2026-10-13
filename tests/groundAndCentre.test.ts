@@ -1,13 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { trolleyPosition } from '../src/physics/crane';
 import { type LoadBody, stepLoad, stretchedLength } from '../src/physics/pendulum';
 import { FIXED_STEP, GRAVITY, PHYSICS_RATE_HZ } from '../src/physics/units';
 import { ZERO, magnitude, subtract, vec3 } from '../src/physics/vec3';
-import { CONCRETE_BLOCK, REBAR_BUNDLE } from '../src/sim/payloads';
-import { centreOffset } from '../src/sim/rigging';
-import { type SimulationState, hookPoint } from '../src/sim/simulation';
+import { CONCRETE_BLOCK } from '../src/sim/payloads';
 import { PIVOT, SPEC, stillCable } from './helpers';
-import { OPEN_FIELD, advance, liftedAt, slungAt } from './simHelpers';
+import { advance, slungAt } from './simHelpers';
 
 const MASS = 2300;
 const load = { mass: MASS, dragArea: 0, hangDepth: 1 };
@@ -78,53 +75,10 @@ describe('ground friction', () => {
     const slung = advance(slungAt(CONCRETE_BLOCK, 12), { hoist: 1, fine: true }, 0.4);
 
     const pulled = advance(slung, { trolley: 1 }, 30);
+    const block = pulled.cargo!.body;
 
-    expect(pulled.body.grounded).toBe(true);
-    expect(pulled.body.position.x).toBeGreaterThan(13);
-    expect(pulled.body.position.x).toBeLessThan(pulled.crane.trolley.radius);
-  });
-});
-
-describe('pendulum length to the centre of gravity', () => {
-  const period = (state: SimulationState): number => {
-    const crossings: number[] = [];
-    let previous = 0;
-    advance(state, {}, 60, OPEN_FIELD, (current) => {
-      const offset = current.body.position.x - trolleyPosition(current.crane, SPEC).x;
-      if (previous < 0 && offset >= 0) crossings.push(current.time);
-      previous = offset;
-    });
-    return (crossings[crossings.length - 1]! - crossings[0]!) / (crossings.length - 1);
-  };
-
-  test('the centre of gravity of hook block plus payload sits below the hook', () => {
-    const rigged = { payload: CONCRETE_BLOCK, slingDepth: 3 };
-    const blockCentre = 3 - CONCRETE_BLOCK.size.y / 2;
-
-    expect(centreOffset(null, 300)).toBe(0);
-    expect(centreOffset(rigged, 300)).toBeCloseTo((3000 * blockCentre) / 3300, 9);
-    expect(centreOffset(rigged, 300)).toBeLessThan(blockCentre);
-  });
-
-  test('a slung load swings with the period of its centre of gravity, not of the hook', () => {
-    const swinging = advance(advance(liftedAt(REBAR_BUNDLE, 12), { trolley: 1 }, 4), {}, 6);
-    const pivot = trolleyPosition(swinging.crane, SPEC);
-    const toCentre = magnitude(subtract(swinging.body.position, pivot));
-    const toHook = magnitude(subtract(hookPoint(swinging, SPEC), pivot));
-
-    const measured = period(swinging);
-
-    expect(toCentre).toBeGreaterThan(toHook + 1);
-    expect(measured).toBeCloseTo(2 * Math.PI * Math.sqrt(toCentre / GRAVITY), 1);
-    expect(Math.abs(measured - 2 * Math.PI * Math.sqrt(toCentre / GRAVITY)) / measured).toBeLessThan(0.01);
-  });
-
-  test('the hook point lies on the rope between trolley and centre of gravity', () => {
-    const lifted = liftedAt(REBAR_BUNDLE, 12);
-    const hook = hookPoint(lifted, SPEC);
-
-    expect(hook.y).toBeGreaterThan(lifted.body.position.y);
-    expect(hook.y).toBeLessThan(SPEC.geometry.trolleyHeight);
-    expect(hook.x).toBeCloseTo(lifted.body.position.x, 2);
+    expect(block.grounded).toBe(true);
+    expect(block.position.x).toBeGreaterThan(13);
+    expect(block.position.x).toBeLessThan(pulled.crane.trolley.radius);
   });
 });
