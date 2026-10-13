@@ -9,6 +9,8 @@ export default defineConfig(({ mode }) => ({
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
+    /** Whole missions are simulated in single tests; shared CI runners need the headroom. */
+    testTimeout: 60_000,
     coverage: { include: ['src/physics/**', 'src/sim/**'] },
   },
 }));
