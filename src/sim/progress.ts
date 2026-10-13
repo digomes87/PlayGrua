@@ -6,6 +6,9 @@ import { type SimulationState, type StepEvents, isCarrying, loadSwing } from './
 
 export type Outcome = 'running' | 'success' | 'failed';
 
+/** What the operator is told about the attempt; the interface holds the wording. */
+export type ProgressMessage = 'none' | 'lmiBlocked' | 'holdReached' | 'overload' | 'offTarget' | 'swingTooHigh' | 'placed';
+
 export interface Progress {
   readonly elapsed: number;
   /** Widest rope angle with the payload in the air, radians. */
@@ -25,7 +28,7 @@ export interface Progress {
   readonly isRopeFouled: boolean;
   readonly wasBlocked: boolean;
   readonly outcome: Outcome;
-  readonly message: string;
+  readonly message: ProgressMessage;
 }
 
 export const HARD_LANDING_SPEED = 0.5;
@@ -49,7 +52,7 @@ export const INITIAL_PROGRESS: Progress = {
   isRopeFouled: false,
   wasBlocked: false,
   outcome: 'running',
-  message: '',
+  message: 'none',
 };
 
 const swingOf = loadSwing;
@@ -107,15 +110,15 @@ function isHolding(goal: ReachGoal, state: SimulationState): boolean {
 }
 
 function judgeReach(progress: Progress, goal: ReachGoal, state: SimulationState, step: number): Progress {
-  if (progress.cutoffs > 0) return { ...progress, outcome: 'failed', message: 'O LMI bloqueou os movimentos.' };
+  if (progress.cutoffs > 0) return { ...progress, outcome: 'failed', message: 'lmiBlocked' };
   const holdTime = isHolding(goal, state) ? progress.holdTime + step : 0;
   if (holdTime < goal.holdSeconds) return { ...progress, holdTime };
-  return { ...progress, holdTime, outcome: 'success', message: 'Carga mantida a 95 % do momento.' };
+  return { ...progress, holdTime, outcome: 'success', message: 'holdReached' };
 }
 
 function judgeStep(progress: Progress, goal: Goal | null, state: SimulationState, step: number): Progress {
   if (goal === null) return progress;
-  if (progress.overloaded) return { ...progress, outcome: 'failed', message: 'Sobrecarga acima de 110 %: falha grave.' };
+  if (progress.overloaded) return { ...progress, outcome: 'failed', message: 'overload' };
   if (goal.kind === 'reach') return judgeReach(progress, goal, state, step);
   return progress;
 }
@@ -148,9 +151,7 @@ export function judgeRelease(progress: Progress, mission: Mission, released: Gro
   const goal = mission.goal;
   if (progress.outcome !== 'running' || goal === null || goal.kind !== 'place') return progress;
   if (released.payload.id !== goal.payloadId) return progress;
-  if (!isInZone(goal, released)) return { ...progress, message: 'Fora do alvo. Reposicione a carga.' };
-  if (!(progress.touchdownSwing <= goal.maxTouchdownSwing)) {
-    return { ...progress, message: 'Balanço acima do permitido no pouso. Tente de novo.' };
-  }
-  return { ...progress, outcome: 'success', message: 'Carga posicionada.' };
+  if (!isInZone(goal, released)) return { ...progress, message: 'offTarget' };
+  if (!(progress.touchdownSwing <= goal.maxTouchdownSwing)) return { ...progress, message: 'swingTooHigh' };
+  return { ...progress, outcome: 'success', message: 'placed' };
 }

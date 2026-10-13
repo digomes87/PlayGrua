@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,20 +8,20 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; form-action 'none'"
     />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <meta name="description" content="Simulador de grua torre com física real: inércia, balanço da carga, limitador de momento e vento." />
+    <meta name="description" content="Tower crane simulator with real physics: inertia, load swing, load moment limiter and wind." />
     <meta name="theme-color" content="#0d0f11" />
-    <title>PlayGrua · Simulador de grua torre</title>
+    <title>PlayGrua · Tower crane simulator</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230d0f11'/%3E%3Cpath d='M9 28V7h2v21zM4 9h25v2H4zM24 11v8' stroke='%23ffb000' stroke-width='2' fill='none'/%3E%3C/svg%3E" />
   </head>
   <body>
-    <main id="stage" aria-label="Simulador">
-      <canvas id="scene" aria-label="Vista 3D do canteiro e da grua"></canvas>
+    <main id="stage" aria-label="Simulator">
+      <canvas id="scene" aria-label="3D view of the site and the crane"></canvas>
     </main>
-    <aside id="hud" aria-label="Painel de instrumentos"></aside>
+    <aside id="hud" aria-label="Instrument panel"></aside>
     <section id="overlay" aria-label="Menu">
       <header class="masthead">
         <h1 class="masthead__title">Play<em>Grua</em></h1>
-        <p class="masthead__tagline">Simulador de grua torre · carregando o canteiro…</p>
+        <p class="masthead__tagline">Tower crane simulator · loading the site…</p>
       </header>
     </section>
     <script type="module" src="/src/main.ts"></script>

@@ -15,8 +15,10 @@ export const SCORING = {
   perCutoff: 100,
 } as const;
 
+export type ScoreCriterion = 'time' | 'swing' | 'landing' | 'moment' | 'collisions';
+
 export interface ScoreLine {
-  readonly label: string;
+  readonly criterion: ScoreCriterion;
   readonly value: string;
   readonly penalty: number;
 }
@@ -34,20 +36,20 @@ export function scoreLines(progress: Progress, mission: Mission): readonly Score
   const landingExcess = Math.max(0, progress.hardestLanding - SCORING.softLandingSpeed);
   const momentExcess = Math.max(0, progress.peakUtilization - comfortableUtilization(mission));
   return [
-    { label: 'Tempo', value: `${progress.elapsed.toFixed(1)} s`, penalty: overtime * SCORING.perSecondOverPar },
-    { label: 'Balanço máximo', value: `${swingDegrees.toFixed(1)}°`, penalty: swingDegrees * SCORING.perDegreeOfSwing },
+    { criterion: 'time', value: `${progress.elapsed.toFixed(1)} s`, penalty: overtime * SCORING.perSecondOverPar },
+    { criterion: 'swing', value: `${swingDegrees.toFixed(1)}°`, penalty: swingDegrees * SCORING.perDegreeOfSwing },
     {
-      label: 'Velocidade de pouso',
+      criterion: 'landing',
       value: `${progress.hardestLanding.toFixed(2)} m/s`,
       penalty: landingExcess * SCORING.perLandingSpeed,
     },
     {
-      label: 'Pico de momento',
+      criterion: 'moment',
       value: `${(progress.peakUtilization * 100).toFixed(0)} %`,
       penalty: momentExcess * SCORING.perUtilization + progress.cutoffs * SCORING.perCutoff,
     },
     {
-      label: 'Colisões e cabo em estrutura',
+      criterion: 'collisions',
       value: `${progress.collisions + progress.ropeContacts}`,
       penalty: (progress.collisions + progress.ropeContacts) * SCORING.perCollision,
     },

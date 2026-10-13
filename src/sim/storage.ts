@@ -1,4 +1,5 @@
-/** localStorage persistence for best results and settings. Every access is guarded: storage may be unavailable. */
+/** localStorage persistence for best results, settings and the interface language. Every access is guarded: storage may be unavailable. */
+import { type Language, parseLanguage } from '../i18n/language';
 import type { MissionId } from './missions';
 
 export interface BestResult {
@@ -25,6 +26,7 @@ export const DEFAULT_SETTINGS: Settings = { expo: 0.5, deadzone: 0.08, muted: fa
 
 const BEST_KEY = 'playgrua.best.v1';
 const SETTINGS_KEY = 'playgrua.settings.v1';
+const LANGUAGE_KEY = 'playgrua.language.v1';
 const MISSION_IDS: readonly MissionId[] = ['free', 'basic', 'limit', 'wind', 'precision', 'heavy'];
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -90,6 +92,12 @@ export function loadSettings(store: KeyValueStore): Settings {
 
 export const saveSettings = (store: KeyValueStore, settings: Settings): boolean =>
   writeJson(store, SETTINGS_KEY, settings);
+
+/** The stored choice, or the default language when there is none or it is not one on offer. */
+export const loadLanguage = (store: KeyValueStore): Language => parseLanguage(readJson(store, LANGUAGE_KEY));
+
+export const saveLanguage = (store: KeyValueStore, language: Language): boolean =>
+  writeJson(store, LANGUAGE_KEY, language);
 
 const UNAVAILABLE: KeyValueStore = { getItem: () => null, setItem: () => undefined };
 
