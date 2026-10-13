@@ -46,6 +46,11 @@ export interface CraneSpec {
     readonly brakeTorque: number;
     readonly controlBandwidth: number;
     readonly freeFriction: number;
+    /** Motor and gear inertia reflected to the slew axis, kg·m². */
+    readonly driveInertia: number;
+    /** Torsional stiffness of tower and jib between the drive and the jib, N·m/rad. */
+    readonly torsionalStiffness: number;
+    readonly torsionalDampingRatio: number;
   };
   readonly trolley: {
     readonly maxSpeed: number;
@@ -156,6 +161,9 @@ export const DEFAULT_CRANE_SPEC: CraneSpec = {
     brakeTorque: 3.0e5,
     controlBandwidth: 2,
     freeFriction: 5.0e4,
+    driveInertia: 2.0e6,
+    torsionalStiffness: 8.8e7,
+    torsionalDampingRatio: 0.05,
   },
   trolley: {
     maxSpeed: 1.0,

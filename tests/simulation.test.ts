@@ -198,7 +198,8 @@ describe('wind on the load', () => {
     const locked = advance(start, { slew: -1, trolley: 1, hoist: 1 }, 10, config);
     const released = advance(start, { weathervane: true }, 240, config);
 
-    expect(locked.crane.slew.angle).toBe(0);
+    expect(locked.crane.slew.driveRate).toBeCloseTo(0, 12);
+    expect(Math.abs(locked.crane.slew.angle)).toBeLessThan(0.01);
     expect(locked.crane.trolley.radius).toBe(20);
     expect(locked.crane.hoist.length).toBe(start.crane.hoist.length);
     expect(Math.abs(released.crane.slew.angle - Math.PI / 2)).toBeLessThan(0.35);

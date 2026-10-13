@@ -10,6 +10,9 @@ export interface SlewState {
   readonly rate: number;
   /** Ramped speed reference followed by the slew drive. */
   readonly reference: number;
+  /** Angle of the slew drive ahead of the jib: the elastic wind-up of tower and jib. */
+  readonly twist: number;
+  readonly driveRate: number;
 }
 
 export interface TrolleyState {
@@ -66,7 +69,7 @@ export const IDLE_COMMAND: CraneCommand = {
 };
 
 export const createCrane = (spec: CraneSpec, radius: number, hookHeight: number): CraneState => ({
-  slew: { angle: 0, rate: 0, reference: 0 },
+  slew: { angle: 0, rate: 0, reference: 0, twist: 0, driveRate: 0 },
   trolley: { radius, speed: 0, reference: 0 },
   hoist: { length: spec.geometry.trolleyHeight - hookHeight, rate: 0, reference: 0 },
 });
@@ -224,41 +227,59 @@ function stepHoist(
   return { length, rate: (length - hoist.length) / step, reference: moved.reference };
 }
 
+const slewDrive = (spec: CraneSpec): AxisDrive => ({
+  acceleration: spec.slew.acceleration,
+  deceleration: spec.slew.brakeDeceleration,
+  driveLimit: spec.slew.motorTorque,
+  brakeLimit: spec.slew.brakeTorque,
+  bandwidth: spec.slew.controlBandwidth,
+});
+
 /** Free slewing: only bearing friction acts and the reference tracks the actual speed. */
-function weathervane(slew: SlewState, spec: CraneSpec, load: AxisLoad): AxisState {
-  const free = advanceAxis(slew, slew.rate, -spec.slew.freeFriction * slew.rate, load);
+function weathervane(drive: AxisState, spec: CraneSpec, load: AxisLoad): AxisState {
+  const free = advanceAxis(drive, drive.rate, -spec.slew.freeFriction * drive.rate, load);
   return { ...free, reference: free.rate };
 }
 
+/** Torque the wound-up tower and jib put on the slewing structure; the drive feels its reaction. */
+function windUpTorque(slew: SlewState, spec: CraneSpec, inertia: number): number {
+  const stiffness = spec.slew.torsionalStiffness;
+  const damping = 2 * spec.slew.torsionalDampingRatio * Math.sqrt(stiffness * inertia);
+  return stiffness * slew.twist + damping * (slew.driveRate - slew.rate);
+}
+
+/**
+ * Slew axis as two inertias joined by the torsional flexibility of tower and jib: the drive (motor,
+ * gear, brake) on one side, the jib with trolley on the other. Motor and brake act on the drive;
+ * wind and rope act on the jib, which lags the drive when it starts and rings when it stops.
+ */
 function stepSlew(crane: CraneState, command: CraneCommand, loads: CraneLoads, spec: CraneSpec, step: number): SlewState {
+  const { slew } = crane;
   const radius = crane.trolley.radius;
-  const drive = spec.slew;
-  const coriolis = -2 * spec.masses.trolley * radius * crane.trolley.speed * crane.slew.rate;
+  const inertia = structureInertia(spec, radius);
+  const windUp = windUpTorque(slew, spec, inertia);
+  const coriolis = -2 * spec.masses.trolley * radius * crane.trolley.speed * slew.rate;
   const load: AxisLoad = {
-    inertia: structureInertia(spec, radius),
-    controlInertia: totalSlewInertia(spec, radius, loads.suspendedMass),
-    external: loads.slewTorque + coriolis,
+    inertia: spec.slew.driveInertia,
+    controlInertia: spec.slew.driveInertia + totalSlewInertia(spec, radius, loads.suspendedMass),
+    external: -windUp,
     compensated: 0,
     step,
   };
-  const target = clamp(command.slew, -1, 1) * drive.maxRate * demandScale(command, spec);
-  const turned =
+  const driveState: AxisState = { rate: slew.driveRate, reference: slew.reference };
+  const target = clamp(command.slew, -1, 1) * spec.slew.maxRate * demandScale(command, spec);
+  const drive =
     command.weathervane && !command.emergencyStop
-      ? weathervane(crane.slew, spec, load)
-      : driveAxis(
-          crane.slew,
-          target,
-          command.emergencyStop,
-          {
-            acceleration: drive.acceleration,
-            deceleration: drive.brakeDeceleration,
-            driveLimit: drive.motorTorque,
-            brakeLimit: drive.brakeTorque,
-            bandwidth: drive.controlBandwidth,
-          },
-          load,
-        );
-  return { angle: crane.slew.angle + turned.rate * step, rate: turned.rate, reference: turned.reference };
+      ? weathervane(driveState, spec, load)
+      : driveAxis(driveState, target, command.emergencyStop, slewDrive(spec), load);
+  const rate = slew.rate + ((windUp + loads.slewTorque + coriolis) / inertia) * step;
+  return {
+    angle: slew.angle + rate * step,
+    rate,
+    reference: drive.reference,
+    twist: slew.twist + (drive.rate - rate) * step,
+    driveRate: drive.rate,
+  };
 }
 
 /** Advances the three drives one fixed step (semi-implicit Euler). */
