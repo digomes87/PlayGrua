@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { IDLE_COMMAND } from '../src/physics/crane';
-import { applyInterlocks } from '../src/physics/interlocks';
+import { OPEN_ZONES, applyInterlocks } from '../src/physics/interlocks';
 import { capacityAt, classify, createLmi, permitsFor, updateLmi, utilizationAt } from '../src/physics/loadChart';
 import { FIXED_STEP, GRAVITY } from '../src/physics/units';
 import { SPEC } from './helpers';
@@ -79,14 +79,26 @@ describe('LMI classification', () => {
 });
 
 describe('LMI motion blocking', () => {
-  test('below 100% every motion is permitted', () => {
-    const gated = applyInterlocks(DEMAND_EVERYTHING, permitsFor('warning'), false);
+  test('below 90% every motion is permitted at full speed', () => {
+    const gated = applyInterlocks(DEMAND_EVERYTHING, { lmi: permitsFor('normal', SPEC.lmi), windLocked: false, zones: OPEN_ZONES });
 
     expect(gated).toEqual(DEMAND_EVERYTHING);
   });
 
+  test('from 90% hoisting up and trolleying out are slowed, the way back is not', () => {
+    const lmi = permitsFor('warning', SPEC.lmi);
+
+    const raising = applyInterlocks(DEMAND_EVERYTHING, { lmi, windLocked: false, zones: OPEN_ZONES });
+    const easing = applyInterlocks(DEMAND_REVERSE, { lmi, windLocked: false, zones: OPEN_ZONES });
+
+    expect(raising.hoist).toBe(SPEC.lmi.approachFactor);
+    expect(raising.trolley).toBe(SPEC.lmi.approachFactor);
+    expect(raising.slew).toBe(1);
+    expect(easing).toEqual(DEMAND_REVERSE);
+  });
+
   test.each(['cutoff', 'overload'] as const)('at %s it blocks hoisting up and trolleying out', (status) => {
-    const gated = applyInterlocks(DEMAND_EVERYTHING, permitsFor(status), false);
+    const gated = applyInterlocks(DEMAND_EVERYTHING, { lmi: permitsFor(status, SPEC.lmi), windLocked: false, zones: OPEN_ZONES });
 
     expect(gated.hoist).toBe(0);
     expect(gated.trolley).toBe(0);
@@ -94,7 +106,7 @@ describe('LMI motion blocking', () => {
   });
 
   test.each(['cutoff', 'overload'] as const)('at %s it still allows lowering and trolleying in', (status) => {
-    const gated = applyInterlocks(DEMAND_REVERSE, permitsFor(status), false);
+    const gated = applyInterlocks(DEMAND_REVERSE, { lmi: permitsFor(status, SPEC.lmi), windLocked: false, zones: OPEN_ZONES });
 
     expect(gated.hoist).toBe(-1);
     expect(gated.trolley).toBe(-1);
@@ -109,7 +121,7 @@ describe('LMI motion blocking', () => {
 
     expect(lmi.status).toBe('cutoff');
     expect(lmi.utilization).toBeCloseTo(1.001, 3);
-    expect(permitsFor(lmi.status)).toEqual({ hoistUp: false, hoistDown: true, trolleyOut: false, trolleyIn: true });
+    expect(permitsFor(lmi.status, SPEC.lmi)).toMatchObject({ hoistUp: false, hoistDown: true, trolleyOut: false, trolleyIn: true });
   });
 
   test('the same load becomes a cutoff just by trolleying out', () => {
@@ -128,14 +140,17 @@ describe('LMI motion blocking', () => {
 
 describe('wind lockout', () => {
   test('refuses every powered motion except lowering the load', () => {
-    const free = permitsFor('normal');
+    const free = permitsFor('normal', SPEC.lmi);
 
-    expect(applyInterlocks(DEMAND_EVERYTHING, free, true)).toMatchObject({ slew: 0, trolley: 0, hoist: 0 });
-    expect(applyInterlocks(DEMAND_REVERSE, free, true)).toMatchObject({ slew: 0, trolley: 0, hoist: -1 });
+    expect(applyInterlocks(DEMAND_EVERYTHING, { lmi: free, windLocked: true, zones: OPEN_ZONES })).toMatchObject({ slew: 0, trolley: 0, hoist: 0 });
+    expect(applyInterlocks(DEMAND_REVERSE, { lmi: free, windLocked: true, zones: OPEN_ZONES })).toMatchObject({ slew: 0, trolley: 0, hoist: -1 });
   });
 
   test('leaves the weathervane request untouched', () => {
-    const gated = applyInterlocks({ ...IDLE_COMMAND, weathervane: true }, permitsFor('normal'), true);
+    const gated = applyInterlocks(
+      { ...IDLE_COMMAND, weathervane: true },
+      { lmi: permitsFor('normal', SPEC.lmi), windLocked: true, zones: OPEN_ZONES },
+    );
 
     expect(gated.weathervane).toBe(true);
   });

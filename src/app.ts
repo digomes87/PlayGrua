@@ -10,6 +10,7 @@ import { type MissionId, missionById } from './sim/missions';
 import { scoreOf } from './sim/scoring';
 import { Session } from './sim/session';
 import { DEFAULT_SITE } from './sim/site';
+import { zonePermits } from './sim/zoning';
 import { type BestResults, type Settings, browserStore, loadBestResults, loadSettings, recordResult, saveSettings } from './sim/storage';
 import { CabAudio } from './ui/audio';
 import { requireElement } from './ui/dom';
@@ -27,9 +28,16 @@ interface Latches {
 
 const RELEASED: Latches = { emergency: false, weathervane: false };
 
-function alarmsFor(instruments: Instruments, latches: Latches): readonly Alarm[] {
+interface Hazards {
+  readonly isZoneLimited: boolean;
+  readonly isRopeFouled: boolean;
+}
+
+function alarmsFor(instruments: Instruments, latches: Latches, hazards: Hazards): readonly Alarm[] {
   const candidates: readonly (Alarm | false)[] = [
     latches.emergency && { text: 'Parada de emergência · X para rearmar', severity: 'danger', steady: true },
+    hazards.isRopeFouled && { text: 'Cabo encostado na estrutura', severity: 'danger', steady: false },
+    hazards.isZoneLimited && { text: 'Limite de zona · movimento bloqueado', severity: 'warning', steady: true },
     instruments.lmiStatus === 'overload' && { text: 'Sobrecarga acima de 110 %', severity: 'danger', steady: false },
     instruments.lmiStatus === 'cutoff' && { text: 'LMI · bloqueio: só descer ou recolher', severity: 'danger', steady: false },
     instruments.lmiStatus === 'warning' && { text: 'LMI · 90 % da capacidade', severity: 'warning', steady: false },
@@ -121,11 +129,20 @@ export class App {
     });
     this.hud.update({
       instruments,
-      alarms: alarmsFor(instruments, this.latches),
+      alarms: alarmsFor(instruments, this.latches, this.hazards()),
       elapsed: this.session.progress.elapsed,
       hint: this.hint(),
       cameraLabel: CAMERA_LABELS[this.view.cameraMode],
     });
+  }
+
+  private hazards(): Hazards {
+    const { spec, site } = this.session.config;
+    const permits = zonePermits(this.session.state.crane, site.zones, spec);
+    return {
+      isZoneLimited: Object.values(permits).includes(false),
+      isRopeFouled: this.session.progress.isRopeFouled,
+    };
   }
 
   private hint(): string {

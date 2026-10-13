@@ -91,7 +91,7 @@ describe('mission flow', () => {
 
     runUntil(session, { hoist: 1, fine: true }, () => session.state.body.position.y > 6);
     run(session, {}, 6);
-    runUntil(session, { trolley: 1, fine: true }, () => session.state.lmi.utilization >= 0.945);
+    runUntil(session, { trolley: 1, fine: true }, () => session.state.lmi.utilization >= 0.95);
     run(session, {}, 12);
 
     expect(session.progress.cutoffs).toBe(0);
@@ -194,10 +194,10 @@ describe('telemetry', () => {
   const session = new Session(missionById('free'), SPEC, DEFAULT_SITE);
   const state = session.state;
   const basic = missionById('basic');
-  const quiet = { touchdownSpeed: 0, bumpSpeed: 0 };
+  const quiet = { touchdownSpeed: 0, bumpSpeed: 0, ropeFouled: false };
 
   test('counts a collision once per contact, not once per step', () => {
-    const hit = { touchdownSpeed: 0, bumpSpeed: 1 };
+    const hit = { touchdownSpeed: 0, bumpSpeed: 1, ropeFouled: false };
     const first = track(INITIAL_PROGRESS, basic, state, hit, SPEC, FIXED_STEP);
     const second = track(first, basic, state, hit, SPEC, FIXED_STEP);
     const apart = track(second, basic, state, quiet, SPEC, FIXED_STEP);
@@ -209,8 +209,8 @@ describe('telemetry', () => {
 
   test('flags landings faster than 0.5 m/s as hard', () => {
     const carrying = { ...state, cargo: { payload: basic.loads[0]!.payload, slingLength: 2, body: state.body, yaw: 0, yawRate: 0 } };
-    const soft = track(INITIAL_PROGRESS, basic, carrying, { touchdownSpeed: 0.3, bumpSpeed: 0 }, SPEC, FIXED_STEP);
-    const hard = track(soft, basic, carrying, { touchdownSpeed: 0.8, bumpSpeed: 0 }, SPEC, FIXED_STEP);
+    const soft = track(INITIAL_PROGRESS, basic, carrying, { touchdownSpeed: 0.3, bumpSpeed: 0, ropeFouled: false }, SPEC, FIXED_STEP);
+    const hard = track(soft, basic, carrying, { touchdownSpeed: 0.8, bumpSpeed: 0, ropeFouled: false }, SPEC, FIXED_STEP);
 
     expect(soft.hardLandings).toBe(0);
     expect(hard.hardLandings).toBe(1);
@@ -273,7 +273,7 @@ describe('scoring', () => {
       'Balanço máximo',
       'Velocidade de pouso',
       'Pico de momento',
-      'Colisões',
+      'Colisões e cabo em estrutura',
     ]);
   });
 });

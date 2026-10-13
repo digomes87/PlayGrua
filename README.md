@@ -143,6 +143,16 @@ contra-lança e no contrapeso gera torque de giro, e a grua tende a alinhar a la
 Alerta a partir de 50 km/h. Acima de 72 km/h a operação é bloqueada (só descer a carga continua
 permitido) e o operador deve liberar o giro com `V`.
 
+### Sistemas de segurança
+
+- **LMI**: a partir de 90 % subir carga e carrinho para fora ficam a 25 % da velocidade, para o
+  bloqueio de 100 % chegar devagar e sem pico.
+- **Zoneamento**: o carrinho não entra em zona proibida (a rua além do tapume). O sistema recusa o
+  giro ou o carrinho que levaria o ponto de suspensão a menos de 2 m da zona, e deixa livre o
+  movimento de afastar.
+- **Cabo em estrutura**: se a reta do carrinho ao moitão atravessa um prédio, o painel alarma e a
+  missão conta como colisão. O cabo não dobra na quina: é só detecção.
+
 ### Colisões
 
 Carga e moitão contra o chão, os prédios, as pilhas e as outras cargas, todos como blocos alinhados
@@ -151,7 +161,7 @@ esteja sobre ele: com o centro para fora da borda a carga não fica apoiada e ca
 
 ## Testes
 
-`npm test` roda 233 testes, entre eles os obrigatórios:
+`npm test` roda 245 testes, entre eles os obrigatórios:
 
 - período do pêndulo contra `2π√(L/g)` para cabos de 5, 20 e 40 m, erro abaixo de 1 %;
 - frequência do modo lento do pêndulo duplo contra a solução analítica, erro abaixo de 1 %;

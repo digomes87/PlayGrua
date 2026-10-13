@@ -24,4 +24,5 @@ export const PALETTE = {
   beam: 0xc9c6bd,
   sling: 0xf7d21e,
   zone: 0x1fd39a,
+  forbidden: 0xd6482c,
 } as const;

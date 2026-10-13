@@ -32,10 +32,11 @@ import {
   windSpeed,
   windVelocityAt,
 } from '../physics/wind';
-import { type Footprint, resolveSideHits, supportHeightBelow } from './collisions';
+import { type Footprint, isRopeFouled, resolveSideHits, supportHeightBelow } from './collisions';
 import { footprintOf } from './payloads';
 import { type GroundLoad, type Slung, asObstacle, cargoObstacle, cargoProps } from './rigging';
 import type { Obstacle, Site } from './site';
+import { zonePermits } from './zoning';
 
 export interface SimulationConfig {
   readonly spec: CraneSpec;
@@ -61,6 +62,8 @@ export interface StepEvents {
   readonly touchdownSpeed: number;
   /** Speed of the hardest side hit against the site, zero when none. */
   readonly bumpSpeed: number;
+  /** The rope runs through a building. */
+  readonly ropeFouled: boolean;
 }
 
 export interface SimulationStep {
@@ -79,7 +82,7 @@ interface Moved {
   readonly body: LoadBody;
   readonly cargo: Slung | null;
   readonly tension: number;
-  readonly events: StepEvents;
+  readonly events: Omit<StepEvents, 'ropeFouled'>;
 }
 
 const HOOK_DRAG_AREA = 0.3;
@@ -242,7 +245,11 @@ export function stepSimulation(
 ): SimulationStep {
   const { spec } = config;
   const wind = stepWind(state.wind, config.wind, step);
-  const gated = applyInterlocks(command, permitsFor(state.lmi.status), isWindLocked(state, config));
+  const gated = applyInterlocks(command, {
+    lmi: permitsFor(state.lmi.status, spec.lmi),
+    windLocked: isWindLocked(state, config),
+    zones: zonePermits(state.crane, config.site.zones, spec),
+  });
   const crane = stepCrane(state.crane, gated, craneLoads(state, config, wind), spec, step);
   const motion = cableMotion(state.crane, crane, spec, step);
   const moved =
@@ -261,6 +268,9 @@ export function stepSimulation(
       lmi,
       tension: moved.tension,
     },
-    events: moved.events,
+    events: {
+      ...moved.events,
+      ropeFouled: isRopeFouled(config.site.obstacles, trolleyPosition(crane, spec), moved.body.position),
+    },
   };
 }

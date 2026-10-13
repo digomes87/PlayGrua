@@ -11,8 +11,19 @@ export interface Obstacle {
   readonly height: number;
 }
 
+/** Area the suspension point must stay out of, such as a street beyond the fence. */
+export interface ForbiddenZone {
+  readonly id: string;
+  readonly label: string;
+  readonly minX: number;
+  readonly maxX: number;
+  readonly minZ: number;
+  readonly maxZ: number;
+}
+
 export interface Site {
   readonly obstacles: readonly Obstacle[];
+  readonly zones: readonly ForbiddenZone[];
 }
 
 export const GROUND_HEIGHT = 0;
@@ -26,4 +37,5 @@ export const DEFAULT_SITE: Site = {
     { id: 'stack-blocks', kind: 'stack', minX: 16, maxX: 19, minZ: 8, maxZ: 11, height: 1.2 },
     { id: 'stack-pipes', kind: 'stack', minX: -16, maxX: -11, minZ: -22, maxZ: -19, height: 1.4 },
   ],
+  zones: [{ id: 'street', label: 'Rua', minX: -80, maxX: 80, minZ: 48, maxZ: 80 }],
 };
