@@ -34,9 +34,10 @@ const wrapDegrees = (degrees: number): number => ((degrees % FULL_TURN) + FULL_T
 export const bearingOf = (heading: number): number =>
   wrapDegrees(radToDeg(Math.atan2(Math.cos(heading), -Math.sin(heading))));
 
-export function windLevelAt(speed: number, spec: CraneSpec): WindLevel {
-  if (speed >= spec.windLimits.lockout) return 'lockout';
-  if (speed >= spec.windLimits.alert) return 'alert';
+/** Level from the average the anemometer measures; the dial still shows the momentary gust. */
+export function windLevelAt(average: number, spec: CraneSpec): WindLevel {
+  if (average >= spec.windLimits.lockout) return 'lockout';
+  if (average >= spec.windLimits.alert) return 'alert';
   return 'normal';
 }
 
@@ -56,7 +57,7 @@ export function readInstruments(state: SimulationState, config: SimulationConfig
     windAverageKmh: msToKmh(state.wind.averageSpeed),
     windBearing: bearingOf(windHeading(state.wind, config.wind)),
     jibBearing: bearingOf(state.crane.slew.angle),
-    windLevel: windLevelAt(speed, spec),
+    windLevel: windLevelAt(state.wind.averageSpeed, spec),
     swingDegrees: radToDeg(loadSwing(state, spec)),
   };
 }

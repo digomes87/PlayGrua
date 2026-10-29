@@ -29,7 +29,6 @@ import {
   createWind,
   slewWindTorque,
   stepWind,
-  windSpeed,
   windVelocityAt,
 } from '../physics/wind';
 import { type Footprint, isRopeFouled, resolveSideHits, supportHeightBelow } from './collisions';
@@ -177,8 +176,9 @@ export const obstaclesIn = (state: SimulationState, site: Site): readonly Obstac
   ...state.groundLoads.map(asObstacle),
 ];
 
+/** The limits key on the average the anemometer measures, so a gust alone cannot lock the crane. */
 export const isWindLocked = (state: SimulationState, config: SimulationConfig): boolean =>
-  windSpeed(state.wind, config.wind) >= config.spec.windLimits.lockout;
+  state.wind.averageSpeed >= config.spec.windLimits.lockout;
 
 function moveHookAlone(
   state: SimulationState,

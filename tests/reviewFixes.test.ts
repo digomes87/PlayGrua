@@ -1,14 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import { structureInertia } from '../src/physics/crane';
 import { type LoadBody, cableStiffness, cableTension, stepLoad } from '../src/physics/pendulum';
-import { FIXED_STEP, GRAVITY, degToRad } from '../src/physics/units';
+import { FIXED_STEP, GRAVITY, degToRad, kmhToMs } from '../src/physics/units';
+import { CALM, windSpeed } from '../src/physics/wind';
 import { ZERO, add, scale, vec3 } from '../src/physics/vec3';
 import { supportHeightBelow } from '../src/sim/collisions';
 import { missionById } from '../src/sim/missions';
 import { CONCRETE_BLOCK, REBAR_BUNDLE } from '../src/sim/payloads';
 import { INITIAL_PROGRESS, judgeRelease } from '../src/sim/progress';
 import { unrig } from '../src/sim/rigging';
-import type { SimulationState } from '../src/sim/simulation';
+import { type SimulationState, createSimulation, isWindLocked } from '../src/sim/simulation';
 import type { Obstacle } from '../src/sim/site';
 import { PIVOT, SPEC, stillCable } from './helpers';
 import { OPEN_FIELD, advance, liftedAt, slungAt } from './simHelpers';
@@ -133,5 +134,40 @@ describe('drag on a sliding load', () => {
     const next = stepLoad(sliding, load, SPEC.cable, stillCable(47), ground, FIXED_STEP).body;
 
     expect(next.velocity.x).toBeCloseTo(6 - SPEC.groundFriction.kinetic * GRAVITY * FIXED_STEP, 9);
+  });
+});
+
+describe('wind limits on the anemometer average', () => {
+  const START = { radius: 20, hookHeight: 20, slewAngle: 0, groundLoads: [] };
+  const GUSTS_PAST_THE_LIMIT = {
+    ...OPEN_FIELD,
+    wind: { ...CALM, meanSpeed: kmhToMs(60), turbulenceIntensity: 0.3, peakSpeed: kmhToMs(90), seed: 7 },
+  };
+  const STORM = {
+    ...OPEN_FIELD,
+    wind: { ...CALM, meanSpeed: kmhToMs(80), turbulenceIntensity: 0.1, peakSpeed: kmhToMs(95), seed: 7 },
+  };
+
+  test('a gust past the limit does not lock the crane while the average stays below it', () => {
+    let gustiest = 0;
+    let locked = false;
+    const moved = advance(createSimulation(GUSTS_PAST_THE_LIMIT, START), { slew: 1 }, 120, GUSTS_PAST_THE_LIMIT, (state) => {
+      gustiest = Math.max(gustiest, windSpeed(state.wind, GUSTS_PAST_THE_LIMIT.wind));
+      locked = locked || isWindLocked(state, GUSTS_PAST_THE_LIMIT);
+    });
+
+    expect(gustiest).toBeGreaterThan(kmhToMs(72));
+    expect(locked).toBe(false);
+    expect(moved.crane.slew.angle).toBeGreaterThan(1);
+  });
+
+  test('a sustained wind past the limit locks slew and trolley but not lowering', () => {
+    const held = advance(createSimulation(STORM, START), { slew: 1, trolley: 1 }, 10, STORM);
+    const lowered = advance(held, { hoist: -1 }, 5, STORM);
+
+    expect(isWindLocked(held, STORM)).toBe(true);
+    expect(Math.abs(held.crane.slew.angle)).toBeLessThan(degToRad(1));
+    expect(held.crane.trolley.radius).toBe(20);
+    expect(lowered.crane.hoist.length).toBeGreaterThan(held.crane.hoist.length);
   });
 });
