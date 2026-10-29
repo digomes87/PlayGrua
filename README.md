@@ -157,8 +157,9 @@ The cutoff is only released below 97 %.
 A mean speed plus gusts from a seeded Ornstein-Uhlenbeck process, a slowly veering direction and a
 speed profile with height (power law, exponent 0.15). The wind on jib, counter-jib and counterweight
 produces a slewing torque, and the crane tends to turn the jib downwind. The wind on the payload is
-described above. An alert sounds from 50 km/h. Above 72 km/h operation is locked out (only lowering
-the load stays available) and the operator must release the slew with `V`.
+described above. The limits key on the one-minute average the anemometer measures, so a gust alone
+does not trip them: an alert sounds from a 50 km/h average and above a 72 km/h average operation is
+locked out (only lowering the load stays available) and the operator must release the slew with `V`.
 
 ### Tag lines
 

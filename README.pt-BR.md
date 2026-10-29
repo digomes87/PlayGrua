@@ -151,9 +151,10 @@ O bloqueio só é liberado abaixo de 97 %.
 Velocidade média mais rajadas por processo de Ornstein-Uhlenbeck com semente, direção que varia
 devagar e perfil de velocidade com a altura (lei de potência, expoente 0,15). O vento na lança, na
 contra-lança e no contrapeso gera torque de giro, e a grua tende a alinhar a lança a favor do vento.
-O vento na carga está descrito acima.
-Alerta a partir de 50 km/h. Acima de 72 km/h a operação é bloqueada (só descer a carga continua
-permitido) e o operador deve liberar o giro com `V`.
+O vento na carga está descrito acima. Os limites olham a média de um minuto que o anemômetro mede,
+então uma rajada sozinha não os dispara: alerta a partir de uma média de 50 km/h e acima de uma média
+de 72 km/h a operação é bloqueada (só descer a carga continua permitido) e o operador deve liberar o
+giro com `V`.
 
 ### Cabo-guia
 
